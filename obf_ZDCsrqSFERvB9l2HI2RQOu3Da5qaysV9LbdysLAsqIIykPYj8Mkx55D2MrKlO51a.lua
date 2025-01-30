@@ -35,7 +35,7 @@ local CONFIG = {
 	EXCLUDE_PLAYERS    --[[=======]] = false,
 	EXCLUDE_TEAMMATES  --[[=======]] = false,
 
-	TOGGLE_KEY         --[[=======]] = Enum.KeyCode.E,
+	TOGGLE_KEY         --[[=======]] = Enum.KeyCode.T,
 	TELEPORT_TOGGLE_KEY--[[=======]] = Enum.KeyCode.Q,
 
 	-- // Less important configurations, only touch if you know what you're doing. // --
