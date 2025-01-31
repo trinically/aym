@@ -33,7 +33,7 @@ local CONFIG = {
 	WALL_DETECTION     --[[=======]] = true,
 	EXCLUDE_NPCS       --[[=======]] = true,
 	EXCLUDE_PLAYERS    --[[=======]] = false,
-	EXCLUDE_TEAMMATES  --[[=======]] = true,
+	EXCLUDE_TEAMMATES  --[[=======]] = false,
 
 	TOGGLE_KEY         --[[=======]] = Enum.KeyCode.F,
 	TELEPORT_TOGGLE_KEY--[[=======]] = Enum.KeyCode.Q,
