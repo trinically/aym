@@ -74,12 +74,10 @@ local CONFIG = {
 
 local LocalPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
-local target, lastJump, lastRetarget, lastMove, lastSidestep, lastEscape, lastTeleport = nil, 0, 0, 0, 0, 0, 0
+local target, lastJump, lastRetarget, lastMove, lastSidestep, lastTeleport = nil, 0, 0, 0, 0, 0,
 local hitCount, lastHit, maneuvering, inCombo = 0, 0, false, false
 local hitTimes = {}
 
-local originalZigzagFrequency = CONFIG.ZIGZAG_FREQUENCY
-local originalZigzagAmplitude = CONFIG.ZIGZAG_AMPLITUDE
 local originalAimSpeed        = CONFIG.AIM_SPEED
 local lastClick               = 0
 
@@ -217,46 +215,6 @@ local function isFirstPerson()
 			(camera.CFrame.Position - LocalPlayer.Character.Head.Position).Magnitude <= 1)
 end
 
-
-local function sidestep(char, dir)
-	if workspace.DistributedGameTime - lastSidestep < CONFIG.SIDESTEP_COOLDOWN then 
-		return 
-	end
-
-	maneuvering             = true
-	local sideDir           = Vector3.new(-dir.Z, 0, dir.X).Unit
-	local pos               = char.PrimaryPart.Position + sideDir * CONFIG.SIDESTEP_DISTANCE
-
-	char.Humanoid:MoveTo(pos)
-
-	lastSidestep            = workspace.DistributedGameTime
-
-	task.delay(CONFIG.SIDESTEP_DURATION, function()
-		maneuvering         = false
-	end)
-end
-
-local function escape(char)
-
-	print("escaping")
-	if workspace.DistributedGameTime - lastEscape < CONFIG.ESCAPE_COOLDOWN then 
-		return 
-	end
-
-	maneuvering             = true
-	local escapeDir         = -char.PrimaryPart.CFrame.LookVector
-	local pos               = char.PrimaryPart.Position + escapeDir * CONFIG.ESCAPE_DISTANCE
-
-	char.Humanoid:MoveTo(pos)
-	char.Humanoid.Jump      = true
-
-	lastEscape              = workspace.DistributedGameTime
-
-	task.delay(CONFIG.ESCAPE_DURATION, function()
-		maneuvering         = false
-	end)
-end
-
 local function click()
 	local now = workspace.DistributedGameTime
 	local actualCPS = CONFIG.CPS + math.random(-CONFIG.CPS_VARIATION, CONFIG.CPS_VARIATION)
@@ -290,74 +248,6 @@ local function TeleportTo(target)
 	end)
 
 	return connection
-end
-
-local function MoveTo(target, guard)
-	if not target or not target.PrimaryPart or not LocalPlayer.Character or 
-		not LocalPlayer.Character:FindFirstChild("Humanoid") or 
-		not LocalPlayer.Character.PrimaryPart then 
-		return false  -- no valid target, just return
-	end
-
-	-- if we need to teleport or chill, just do it
-	if CONFIG.TELEPORT_MODE or isSitting(target) or getWalkSpeed(target) >= 20 then
-		TeleportTo(target)
-		return true
-	end
-
-	local time                = workspace.DistributedGameTime
-	local startPosition       = LocalPlayer.Character.PrimaryPart.Position
-	local targetPosition      = target.PrimaryPart.Position
-	local direction           = (targetPosition - startPosition).Unit
-	local distance            = (targetPosition - startPosition).Magnitude
-	local targetDistance      = inCombo and CONFIG.COMBO_DISTANCE or CONFIG.TARGET_DISTANCE
-
-	local perpendicularDirection = Vector3.new(-direction.Z, 0, direction.X).Unit
-	local targetVelocity      = target.PrimaryPart.Velocity
-	local targetSpeed         = targetVelocity.Magnitude
-	local targetDir           = targetVelocity.Unit
-
-	-- calculate predicted position of the target
-	local predictedPosition   = targetPosition + targetVelocity
-	local dotProduct          = direction:Dot(targetDir)
-	local angle               = math.acos(dotProduct)
-	local cutAcross           = false
-
-	if angle > math.pi/4 and angle < 3*math.pi/4 and targetSpeed > 5 then
-		cutAcross = true
-	end
-
-	local desiredPosition
-
-	if cutAcross then
-		local timeToIntercept   = distance / (LocalPlayer.Character.Humanoid.WalkSpeed + targetSpeed)
-		desiredPosition         = predictedPosition - targetDir * (targetDistance + timeToIntercept * targetSpeed)
-	else
-		local zigzagFrequency   = inCombo and CONFIG.COMBO_ZIGZAG_FREQUENCY or CONFIG.ZIGZAG_FREQUENCY
-		local zigzagAmplitude    = inCombo and CONFIG.COMBO_ZIGZAG_AMPLITUDE or CONFIG.ZIGZAG_AMPLITUDE
-		local zigzag            = perpendicularDirection * math.sin(time * zigzagFrequency) * zigzagAmplitude
-
-		desiredPosition         = targetPosition - direction * targetDistance + zigzag
-	end
-
-	if distance <= targetDistance then
-		desiredPosition         = startPosition + (startPosition - targetPosition).Unit * (targetDistance - distance + 0.5)
-	end
-
-	LocalPlayer.Character.Humanoid:MoveTo(desiredPosition)
-
-	if distance <= targetDistance + 1 then
-		local speed             = 16 * (distance / targetDistance)
-		LocalPlayer.Character.Humanoid.WalkSpeed = math.max(1, math.min(16, speed))
-	else
-		LocalPlayer.Character.Humanoid.WalkSpeed = 16
-	end
-
-	if math.abs(distance - targetDistance) <= CONFIG.CLICK_RANGE then
-		click()  -- click if we're close enough to the target
-	end
-
-	return true  -- everything went fine
 end
 
 local function toggle(_, state)
@@ -421,8 +311,6 @@ RunService.Heartbeat:Connect(function()
 	if target then
 		if CONFIG.TELEPORT_MODE then
 			TeleportTo(target)
-		else
-			MoveTo(target, false)
 		end
 	else
 		aimlock()  -- aimlock will still run but won't attempt to move
