@@ -24,16 +24,16 @@ local ContextActionService = game:GetService("ContextActionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CONFIG = {
-	DETECTION_DISTANCE --[[=======]] = 1000,
+	DETECTION_DISTANCE --[[=======]] = 100,
 	AIM_SPEED          --[[=======]] = 2,
 	AIM_ACCURACY       --[[=======]] = 100,
 
 	ACTIVE             --[[=======]] = true,
 	TELEPORT_MODE      --[[=======]] = false, 
 	WALL_DETECTION     --[[=======]] = true,
-	EXCLUDE_NPCS       --[[=======]] = false,
+	EXCLUDE_NPCS       --[[=======]] = true,
 	EXCLUDE_PLAYERS    --[[=======]] = false,
-	EXCLUDE_TEAMMATES  --[[=======]] = false,
+	EXCLUDE_TEAMMATES  --[[=======]] = true,
 
 	TOGGLE_KEY         --[[=======]] = Enum.KeyCode.F,
 	TELEPORT_TOGGLE_KEY--[[=======]] = Enum.KeyCode.Q,
@@ -43,7 +43,7 @@ local CONFIG = {
 	VERSION = "v1.1",
 	ACTION_NAME = "ToggleAimston",
 
-	RETARGET_INTERVAL = 5,
+	RETARGET_INTERVAL = 120,
 
 	ZIGZAG_FREQUENCY = 7,
 	ZIGZAG_AMPLITUDE = 3,
