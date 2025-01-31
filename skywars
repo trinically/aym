@@ -74,7 +74,7 @@ local CONFIG = {
 
 local LocalPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
-local target, lastJump, lastRetarget, lastMove, lastSidestep, lastTeleport = nil, 0, 0, 0, 0, 0,
+local target, lastJump, lastRetarget, lastMove, lastSidestep, lastTeleport = nil, 0, 0, 0, 0, 0
 local hitCount, lastHit, maneuvering, inCombo = 0, 0, false, false
 local hitTimes = {}
 
@@ -287,7 +287,7 @@ if UserInputService.TouchEnabled then
 	ContextActionService:SetTitle(CONFIG.TELEPORT_ACTION_NAME, "TP")
 end
 
-print(string.format("Running aym %s", CONFIG.VERSION))
+print(string.format("Running aym %s. Skywars build", CONFIG.VERSION))
 
 RunService.Heartbeat:Connect(function()
 	if not CONFIG.ACTIVE then return end
