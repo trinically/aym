@@ -209,10 +209,7 @@ end
 
 
 local function isFirstPerson()
-	return LocalPlayer.CameraMode == Enum.CameraMode.LockFirstPerson or 
-		(LocalPlayer.Character and 
-			LocalPlayer.Character:FindFirstChild("Head") and 
-			(camera.CFrame.Position - LocalPlayer.Character.Head.Position).Magnitude <= 1)
+	return true
 end
 
 local function click()
