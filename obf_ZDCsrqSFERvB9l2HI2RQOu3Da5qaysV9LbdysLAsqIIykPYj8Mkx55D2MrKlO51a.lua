@@ -35,7 +35,7 @@ local CONFIG = {
 	EXCLUDE_PLAYERS    --[[=======]] = false,
 	EXCLUDE_TEAMMATES  --[[=======]] = false,
 
-	TOGGLE_KEY         --[[=======]] = Enum.KeyCode.T,
+	TOGGLE_KEY         --[[=======]] = Enum.KeyCode.F,
 	TELEPORT_TOGGLE_KEY--[[=======]] = Enum.KeyCode.Q,
 
 	-- // Less important configurations, only touch if you know what you're doing. // --
@@ -263,7 +263,7 @@ local function click()
 	local clickInterval = 1 / actualCPS
 	if now - lastClick >= clickInterval then
 		--script.Parent.cps.Clicked.Value = not script.Parent.cps.Clicked.Value
-		--mouse1click()
+		mouse1click()
 		lastClick = now
 	end
 end
