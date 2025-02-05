@@ -110,7 +110,7 @@ local function getTarget()
 
 		if skipTarget then continue end
 
-		local isValidTarget = d <= 20
+		local isValidTarget = true
 
 		if isValidTarget and (not closest or d < dist) then
 			closest, dist = model, d
