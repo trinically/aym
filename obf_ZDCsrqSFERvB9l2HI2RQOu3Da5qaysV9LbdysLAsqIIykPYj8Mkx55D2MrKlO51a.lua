@@ -58,7 +58,7 @@ local CONFIG = {
 
 	ESCAPE_COOLDOWN = 2,
 
-	CLICK_RANGE = 12,
+	CLICK_RANGE = 30,
 
 	CPS = 22,
 
