@@ -210,7 +210,7 @@ local function MoveTo(target, guard)
 	local targetPosition = target.PrimaryPart.Position
 	local direction = (targetPosition - startPosition).Unit
 	local distance = (targetPosition - startPosition).Magnitude
-	local targetDistance = inCombo and CONFIG.COMBO_DISTANCE or CONFIG.TARGET_DISTANCE
+	local targetDistance = CONFIG.TARGET_DISTANCE
 
 	local strafeDirection = Vector3.new(-direction.Z, 0, direction.X).Unit
 	local strafeOffset = strafeDirection * math.sin(time * 2) * 3
