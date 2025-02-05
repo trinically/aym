@@ -25,7 +25,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CONFIG = {
 	DETECTION_DISTANCE --[[=======]] = 1000,
-	AIM_SPEED          --[[=======]] = 2,
+	AIM_SPEED          --[[=======]] = 5,
 	AIM_ACCURACY       --[[=======]] = 100,
 
 	ACTIVE             --[[=======]] = true,
