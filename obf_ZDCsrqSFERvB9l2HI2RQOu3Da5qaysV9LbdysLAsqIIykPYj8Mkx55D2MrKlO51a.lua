@@ -164,7 +164,6 @@ local function click()
 	local actualCPS = CONFIG.CPS + math.random(-CONFIG.CPS_VARIATION, CONFIG.CPS_VARIATION)
 	local clickInterval = 1 / actualCPS
 	if now - lastClick >= clickInterval then
-		--script.Parent.cps.Clicked.Value = not script.Parent.cps.Clicked.Value
 		mouse1click()
 		lastClick = now
 	end
@@ -194,6 +193,38 @@ local function TeleportTo(target)
 	return connection
 end
 
+local function calculateDesiredPosition(direction, targetPosition, targetDistance, time, perpendicularDirection, targetVelocity, startPosition, distance, inCombo)
+	local predictedPosition = targetPosition + targetVelocity
+	local targetDir = targetVelocity.Unit
+	local targetSpeed = targetVelocity.Magnitude
+	local dotProduct = direction:Dot(targetDir)
+	local angle = math.acos(dotProduct)
+	local cutAcross = false
+
+	if angle > math.pi/4 and angle < 3*math.pi/4 and targetSpeed > 5 then
+		cutAcross = true
+	end
+
+	local desiredPosition
+
+	if cutAcross then
+		local timeToIntercept = distance / (LocalPlayer.Character.Humanoid.WalkSpeed + targetSpeed)
+		desiredPosition = predictedPosition - targetDir * (targetDistance + timeToIntercept * targetSpeed)
+	else
+		local zigzagFrequency = inCombo and CONFIG.COMBO_ZIGZAG_FREQUENCY or CONFIG.ZIGZAG_FREQUENCY
+		local zigzagAmplitude = inCombo and CONFIG.COMBO_ZIGZAG_AMPLITUDE or CONFIG.ZIGZAG_AMPLITUDE
+		local zigzag = perpendicularDirection * math.sin(time * zigzagFrequency) * zigzagAmplitude
+
+		desiredPosition = targetPosition - direction * targetDistance + zigzag
+	end
+
+	if distance <= targetDistance then
+		desiredPosition = startPosition + (startPosition - targetPosition).Unit * (targetDistance - distance + 0.5)
+	end
+
+	return desiredPosition
+end
+
 local function MoveTo(target, guard)
 	if not target or not target.PrimaryPart or not LocalPlayer.Character or 
 		not LocalPlayer.Character:FindFirstChild("Humanoid") or 
@@ -206,56 +237,45 @@ local function MoveTo(target, guard)
 		return true
 	end
 
-	local time                = workspace.DistributedGameTime
-	local startPosition       = LocalPlayer.Character.PrimaryPart.Position
-	local targetPosition      = target.PrimaryPart.Position
-	local direction           = (targetPosition - startPosition).Unit
-	local distance            = (targetPosition - startPosition).Magnitude
-	local targetDistance      = inCombo and CONFIG.COMBO_DISTANCE or CONFIG.TARGET_DISTANCE
+	local time = workspace.DistributedGameTime
+	local startPosition = LocalPlayer.Character.PrimaryPart.Position
+	local targetPosition = target.PrimaryPart.Position
+	local direction = (targetPosition - startPosition).Unit
+	local distance = (targetPosition - startPosition).Magnitude
+	local targetDistance = inCombo and CONFIG.COMBO_DISTANCE or CONFIG.TARGET_DISTANCE
 
 	local perpendicularDirection = Vector3.new(-direction.Z, 0, direction.X).Unit
-	local targetVelocity      = target.PrimaryPart.Velocity
-	local targetSpeed         = targetVelocity.Magnitude
-	local targetDir           = targetVelocity.Unit
+	local targetVelocity = target.PrimaryPart.Velocity
+	local targetSpeed = targetVelocity.Magnitude
+	local targetDir = targetVelocity.Unit
 
-	-- calculate predicted position of the target
-	local predictedPosition   = targetPosition + targetVelocity
-	local dotProduct          = direction:Dot(targetDir)
-	local angle               = math.acos(dotProduct)
-	local cutAcross           = false
+	local desiredPosition = calculateDesiredPosition(direction, targetPosition, targetDistance, time, perpendicularDirection)
 
-	if angle > math.pi/4 and angle < 3*math.pi/4 and targetSpeed > 5 then
-		cutAcross = true
-	end
+	local moveDirection = (desiredPosition - startPosition).Unit
 
-	local desiredPosition
+	local forwardKey = 0x57  -- 'W' key
+	local backwardKey = 0x53 -- 'S' key
+	local leftKey = 0x41     -- 'A' key
+	local rightKey = 0x44    -- 'D' key
 
-	if cutAcross then
-		local timeToIntercept   = distance / (LocalPlayer.Character.Humanoid.WalkSpeed + targetSpeed)
-		desiredPosition         = predictedPosition - targetDir * (targetDistance + timeToIntercept * targetSpeed)
-	else
-		local zigzagFrequency   = inCombo and CONFIG.COMBO_ZIGZAG_FREQUENCY or CONFIG.ZIGZAG_FREQUENCY
-		local zigzagAmplitude    = inCombo and CONFIG.COMBO_ZIGZAG_AMPLITUDE or CONFIG.ZIGZAG_AMPLITUDE
-		local zigzag            = perpendicularDirection * math.sin(time * zigzagFrequency) * zigzagAmplitude
+	keyrelease(forwardKey)
+	keyrelease(backwardKey)
+	keyrelease(leftKey)
+	keyrelease(rightKey)
 
-		desiredPosition         = targetPosition - direction * targetDistance + zigzag
-	end
-
-	if distance <= targetDistance then
-		desiredPosition         = startPosition + (startPosition - targetPosition).Unit * (targetDistance - distance + 0.5)
-	end
-
-	LocalPlayer.Character.Humanoid:MoveTo(desiredPosition)
-
+	if moveDirection.Z < 0 then keypress(forwardKey) end
+	if moveDirection.Z > 0 then keypress(backwardKey) end
+	if moveDirection.X < 0 then keypress(leftKey) end
+	if moveDirection.X > 0 then keypress(rightKey) end
 	if distance <= targetDistance + 1 then
-		local speed             = 16 * (distance / targetDistance)
+		local speed = 16 * (distance / targetDistance)
 		LocalPlayer.Character.Humanoid.WalkSpeed = math.max(1, math.min(16, speed))
 	else
 		LocalPlayer.Character.Humanoid.WalkSpeed = 16
 	end
 
 	if math.abs(distance - targetDistance) <= CONFIG.CLICK_RANGE then
-		click()  -- click if we're close enough to the target
+		click()
 	end
 
 	return true  -- everything went fine
@@ -325,7 +345,7 @@ RunService.Heartbeat:Connect(function()
 			MoveTo(target, false)
 		end
 	else
-		aimlock()  -- aimlock will still run but won't attempt to move
+		aimlock() 
 	end
 
 	character.Humanoid.Jump = true
