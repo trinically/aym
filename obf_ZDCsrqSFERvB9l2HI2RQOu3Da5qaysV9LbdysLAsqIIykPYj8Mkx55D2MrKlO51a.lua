@@ -25,7 +25,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CONFIG = {
 	DETECTION_DISTANCE --[[=======]] = 1000,
-	AIM_SPEED          --[[=======]] = 5,
+	AIM_SPEED          --[[=======]] = 8,
 	AIM_ACCURACY       --[[=======]] = 100,
 
 	ACTIVE             --[[=======]] = true,
@@ -54,10 +54,9 @@ local CONFIG = {
 
 	MAX_VERTICAL_DISTANCE = 20,
 
-	CLICK_RANGE = 12,
+	CLICK_RANGE = 32,
 
 	CPS = 25,
-
 	CPS_VARIATION = 2,
 
 	TELEPORT_ACTION_NAME = "ToggleTeleportMode",
