@@ -83,14 +83,6 @@ local originalZigzagAmplitude = CONFIG.ZIGZAG_AMPLITUDE
 local originalAimSpeed        = CONFIG.AIM_SPEED
 local lastClick               = 0
 
-local function isSitting(target)
-	return target:FindFirstChildOfClass("Humanoid") and target:FindFirstChildOfClass("Humanoid").Sit
-end
-
-local function getWalkSpeed(target)
-	return target:FindFirstChildOfClass("Humanoid") and target:FindFirstChildOfClass("Humanoid").WalkSpeed or 0
-end
-
 local function isVisible(target)
 	if not target then
 		warn("isVisible: Target is nil")
@@ -217,52 +209,11 @@ local function isFirstPerson()
 			(camera.CFrame.Position - LocalPlayer.Character.Head.Position).Magnitude <= 1)
 end
 
-
-local function sidestep(char, dir)
-	if workspace.DistributedGameTime - lastSidestep < CONFIG.SIDESTEP_COOLDOWN then 
-		return 
-	end
-
-	maneuvering             = true
-	local sideDir           = Vector3.new(-dir.Z, 0, dir.X).Unit
-	local pos               = char.PrimaryPart.Position + sideDir * CONFIG.SIDESTEP_DISTANCE
-
-	char.Humanoid:MoveTo(pos)
-
-	lastSidestep            = workspace.DistributedGameTime
-
-	task.delay(CONFIG.SIDESTEP_DURATION, function()
-		maneuvering         = false
-	end)
-end
-
-local function escape(char)
-
-	print("escaping")
-	if workspace.DistributedGameTime - lastEscape < CONFIG.ESCAPE_COOLDOWN then 
-		return 
-	end
-
-	maneuvering             = true
-	local escapeDir         = -char.PrimaryPart.CFrame.LookVector
-	local pos               = char.PrimaryPart.Position + escapeDir * CONFIG.ESCAPE_DISTANCE
-
-	char.Humanoid:MoveTo(pos)
-	char.Humanoid.Jump      = true
-
-	lastEscape              = workspace.DistributedGameTime
-
-	task.delay(CONFIG.ESCAPE_DURATION, function()
-		maneuvering         = false
-	end)
-end
-
 local function click()
 	local now = workspace.DistributedGameTime
 	local actualCPS = CONFIG.CPS + math.random(-CONFIG.CPS_VARIATION, CONFIG.CPS_VARIATION)
 	local clickInterval = 1 / actualCPS
 	if now - lastClick >= clickInterval then
-		--script.Parent.cps.Clicked.Value = not script.Parent.cps.Clicked.Value
 		mouse1click()
 		lastClick = now
 	end
@@ -288,13 +239,7 @@ local function MoveTo(target, guard)
 	if not target or not target.PrimaryPart or not LocalPlayer.Character or 
 		not LocalPlayer.Character:FindFirstChild("Humanoid") or 
 		not LocalPlayer.Character.PrimaryPart then 
-		return false  -- no valid target, just return
-	end
-
-	-- if we need to teleport or chill, just do it
-	if CONFIG.TELEPORT_MODE or isSitting(target) or getWalkSpeed(target) >= 20 then
-		TeleportTo(target)
-		return true
+		return false  
 	end
 
 	local time                = workspace.DistributedGameTime
@@ -349,7 +294,7 @@ local function MoveTo(target, guard)
 		click()  -- click if we're close enough to the target
 	end
 
-	return true  -- everything went fine
+	return true  
 end
 
 local function toggle(_, state)
@@ -378,7 +323,6 @@ local function toggleTeleportMode(_, state)
 		print("No target to teleport to")
 	end
 end
-
 
 ContextActionService:BindAction(CONFIG.ACTION_NAME, toggle, true, CONFIG.TOGGLE_KEY, Enum.KeyCode.ButtonR3)
 ContextActionService:BindAction(CONFIG.TELEPORT_ACTION_NAME, toggleTeleportMode, true, CONFIG.TELEPORT_TOGGLE_KEY)
