@@ -197,7 +197,7 @@ local function MoveTo(target, guard)
 	if not target or not target.PrimaryPart or not LocalPlayer.Character or 
 		not LocalPlayer.Character:FindFirstChild("Humanoid") or 
 		not LocalPlayer.Character.PrimaryPart then 
-		return false  -- no valid target, just return
+		return false
 	end
 
 	if CONFIG.TELEPORT_MODE then
@@ -213,19 +213,12 @@ local function MoveTo(target, guard)
 	local targetDistance = inCombo and CONFIG.COMBO_DISTANCE or CONFIG.TARGET_DISTANCE
 
 	local strafeDirection = Vector3.new(-direction.Z, 0, direction.X).Unit
-
-	local strafeFrequency = 4  -
-	local strafeAmplitude = 3  
-	local strafeOffset = strafeDirection * math.sin(time * strafeFrequency) * strafeAmplitude
+	local strafeOffset = strafeDirection * math.sin(time * 2) * 3
 
 	local desiredPosition = targetPosition - direction * targetDistance + strafeOffset
-
 	local moveDirection = (desiredPosition - startPosition).Unit
 
-	local forwardKey = 0x57  -- 'W' key
-	local backwardKey = 0x53 -- 'S' key
-	local leftKey = 0x41     -- 'A' key
-	local rightKey = 0x44    -- 'D' key
+	local forwardKey, backwardKey, leftKey, rightKey = 0x57, 0x53, 0x41, 0x44
 
 	keyrelease(forwardKey)
 	keyrelease(backwardKey)
@@ -248,8 +241,9 @@ local function MoveTo(target, guard)
 		click()
 	end
 
-	return true 
+	return true
 end
+
 
 local function toggle(_, state)
 	if state ~= Enum.UserInputState.Begin then return end
