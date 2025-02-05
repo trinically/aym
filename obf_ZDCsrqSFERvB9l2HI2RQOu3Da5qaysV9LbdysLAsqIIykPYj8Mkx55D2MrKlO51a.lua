@@ -220,11 +220,6 @@ local function MoveTo(target, guard)
 
 	local forwardKey, backwardKey, leftKey, rightKey = 0x57, 0x53, 0x41, 0x44
 
-	keyrelease(forwardKey)
-	keyrelease(backwardKey)
-	keyrelease(leftKey)
-	keyrelease(rightKey)
-
 	if moveDirection.Z < 0 then keypress(forwardKey) end
 	if moveDirection.Z > 0 then keypress(backwardKey) end
 	if moveDirection.X < 0 then keypress(leftKey) end
