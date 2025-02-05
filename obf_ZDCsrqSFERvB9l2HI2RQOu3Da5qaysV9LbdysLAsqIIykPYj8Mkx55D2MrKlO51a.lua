@@ -40,7 +40,7 @@ local CONFIG = {
 
 	-- // Less important configurations, only touch if you know what you're doing. // --
 
-	VERSION = "v1.1",
+	VERSION = "v1.2, teleport mode fixed [DEBUG]",
 	ACTION_NAME = "ToggleAimston",
 
 	RETARGET_INTERVAL = 5,
@@ -54,15 +54,11 @@ local CONFIG = {
 
 	MAX_VERTICAL_DISTANCE = 20,
 
-	SIDESTEP_COOLDOWN = 0.5,
+	CLICK_RANGE = 12,
 
-	ESCAPE_COOLDOWN = 2,
+	CPS = 25,
 
-	CLICK_RANGE = 30,
-
-	CPS = 22,
-
-	CPS_VARIATION = 3,
+	CPS_VARIATION = 2,
 
 	TELEPORT_ACTION_NAME = "ToggleTeleportMode",
 	TELEPORT_PATTERN = {
@@ -82,48 +78,6 @@ local originalZigzagFrequency = CONFIG.ZIGZAG_FREQUENCY
 local originalZigzagAmplitude = CONFIG.ZIGZAG_AMPLITUDE
 local originalAimSpeed        = CONFIG.AIM_SPEED
 local lastClick               = 0
-
-local function isSitting(target)
-	return target:FindFirstChildOfClass("Humanoid") and target:FindFirstChildOfClass("Humanoid").Sit
-end
-
-local function getWalkSpeed(target)
-	return target:FindFirstChildOfClass("Humanoid") and target:FindFirstChildOfClass("Humanoid").WalkSpeed or 0
-end
-
-local function isVisible(target)
-	if not target then
-		warn("isVisible: Target is nil")
-		return false 
-	end
-
-	if not LocalPlayer or not LocalPlayer.Character then
-		warn("isVisible: LocalPlayer or Character is nil")
-		return false
-	end
-
-	if not target.PrimaryPart then
-		warn("isVisible: Target does not have a PrimaryPart")
-		return false
-	end
-
-	local origin = LocalPlayer.Character.PrimaryPart.Position
-	local destination = target.PrimaryPart.Position
-	local direction = (destination - origin).Unit
-	local distance = (destination - origin).Magnitude
-
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = {LocalPlayer.Character}
-
-	local result = workspace:Raycast(origin, direction * distance, params)
-
-	if not result then
-		return true
-	end
-
-	return result.Instance:IsDescendantOf(target) or result.Instance.Transparency > 0
-end
 
 local function getTarget()
 	if not LocalPlayer or not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then
@@ -156,10 +110,7 @@ local function getTarget()
 
 		if skipTarget then continue end
 
-		local isValidTarget = 
-			not CONFIG.WALL_DETECTION or 
-			isVisible(model) or 
-			d <= 20
+		local isValidTarget = d <= 20
 
 		if isValidTarget and (not closest or d < dist) then
 			closest, dist = model, d
@@ -209,54 +160,6 @@ local function aimlock()
 	end
 end
 
-
-local function isFirstPerson()
-	return LocalPlayer.CameraMode == Enum.CameraMode.LockFirstPerson or 
-		(LocalPlayer.Character and 
-			LocalPlayer.Character:FindFirstChild("Head") and 
-			(camera.CFrame.Position - LocalPlayer.Character.Head.Position).Magnitude <= 1)
-end
-
-
-local function sidestep(char, dir)
-	if workspace.DistributedGameTime - lastSidestep < CONFIG.SIDESTEP_COOLDOWN then 
-		return 
-	end
-
-	maneuvering             = true
-	local sideDir           = Vector3.new(-dir.Z, 0, dir.X).Unit
-	local pos               = char.PrimaryPart.Position + sideDir * CONFIG.SIDESTEP_DISTANCE
-
-	char.Humanoid:MoveTo(pos)
-
-	lastSidestep            = workspace.DistributedGameTime
-
-	task.delay(CONFIG.SIDESTEP_DURATION, function()
-		maneuvering         = false
-	end)
-end
-
-local function escape(char)
-
-	print("escaping")
-	if workspace.DistributedGameTime - lastEscape < CONFIG.ESCAPE_COOLDOWN then 
-		return 
-	end
-
-	maneuvering             = true
-	local escapeDir         = -char.PrimaryPart.CFrame.LookVector
-	local pos               = char.PrimaryPart.Position + escapeDir * CONFIG.ESCAPE_DISTANCE
-
-	char.Humanoid:MoveTo(pos)
-	char.Humanoid.Jump      = true
-
-	lastEscape              = workspace.DistributedGameTime
-
-	task.delay(CONFIG.ESCAPE_DURATION, function()
-		maneuvering         = false
-	end)
-end
-
 local function click()
 	local now = workspace.DistributedGameTime
 	local actualCPS = CONFIG.CPS + math.random(-CONFIG.CPS_VARIATION, CONFIG.CPS_VARIATION)
@@ -299,8 +202,7 @@ local function MoveTo(target, guard)
 		return false  -- no valid target, just return
 	end
 
-	-- if we need to teleport or chill, just do it
-	if CONFIG.TELEPORT_MODE or isSitting(target) or getWalkSpeed(target) >= 20 then
+	if CONFIG.TELEPORT_MODE then
 		TeleportTo(target)
 		return true
 	end
@@ -410,8 +312,7 @@ RunService.Heartbeat:Connect(function()
 	local shouldRetarget = now - lastRetarget >= CONFIG.RETARGET_INTERVAL or
 		not target or
 		not target:IsA("Model") or
-		not target:FindFirstChildOfClass("Humanoid") or
-		not isVisible(target)
+		not target:FindFirstChildOfClass("Humanoid")
 
 	if shouldRetarget then
 		target = getTarget()
@@ -430,10 +331,5 @@ RunService.Heartbeat:Connect(function()
 
 	character.Humanoid.Jump = true
 
-
-	if isFirstPerson() then
-		coroutine.wrap(aimlock)()
-	else
-		target = nil -- clear the target if not in first person.
-	end
+	coroutine.wrap(aimlock)()
 end)
