@@ -60,9 +60,9 @@ local CONFIG = {
 
 	CLICK_RANGE = 12,
 
-	CPS = 20,
+	CPS = 22,
 
-	CPS_VARIATION = 6,
+	CPS_VARIATION = 3,
 
 	TELEPORT_ACTION_NAME = "ToggleTeleportMode",
 	TELEPORT_PATTERN = {
