@@ -60,7 +60,7 @@ local CONFIG = {
 
 	CLICK_RANGE = 12,
 
-	CPS = 18,
+	CPS = 20,
 
 	CPS_VARIATION = 6,
 
