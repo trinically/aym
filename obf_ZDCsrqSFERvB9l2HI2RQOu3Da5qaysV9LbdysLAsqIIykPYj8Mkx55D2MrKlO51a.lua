@@ -193,38 +193,6 @@ local function TeleportTo(target)
 	return connection
 end
 
-local function calculateDesiredPosition(direction, targetPosition, targetDistance, time, perpendicularDirection, targetVelocity, startPosition, distance, inCombo)
-	local predictedPosition = targetPosition + targetVelocity
-	local targetDir = targetVelocity.Unit
-	local targetSpeed = targetVelocity.Magnitude
-	local dotProduct = direction:Dot(targetDir)
-	local angle = math.acos(dotProduct)
-	local cutAcross = false
-
-	if angle > math.pi/4 and angle < 3*math.pi/4 and targetSpeed > 5 then
-		cutAcross = true
-	end
-
-	local desiredPosition
-
-	if cutAcross then
-		local timeToIntercept = distance / (LocalPlayer.Character.Humanoid.WalkSpeed + targetSpeed)
-		desiredPosition = predictedPosition - targetDir * (targetDistance + timeToIntercept * targetSpeed)
-	else
-		local zigzagFrequency = inCombo and CONFIG.COMBO_ZIGZAG_FREQUENCY or CONFIG.ZIGZAG_FREQUENCY
-		local zigzagAmplitude = inCombo and CONFIG.COMBO_ZIGZAG_AMPLITUDE or CONFIG.ZIGZAG_AMPLITUDE
-		local zigzag = perpendicularDirection * math.sin(time * zigzagFrequency) * zigzagAmplitude
-
-		desiredPosition = targetPosition - direction * targetDistance + zigzag
-	end
-
-	if distance <= targetDistance then
-		desiredPosition = startPosition + (startPosition - targetPosition).Unit * (targetDistance - distance + 0.5)
-	end
-
-	return desiredPosition
-end
-
 local function MoveTo(target, guard)
 	if not target or not target.PrimaryPart or not LocalPlayer.Character or 
 		not LocalPlayer.Character:FindFirstChild("Humanoid") or 
@@ -244,12 +212,13 @@ local function MoveTo(target, guard)
 	local distance = (targetPosition - startPosition).Magnitude
 	local targetDistance = inCombo and CONFIG.COMBO_DISTANCE or CONFIG.TARGET_DISTANCE
 
-	local perpendicularDirection = Vector3.new(-direction.Z, 0, direction.X).Unit
-	local targetVelocity = target.PrimaryPart.Velocity
-	local targetSpeed = targetVelocity.Magnitude
-	local targetDir = targetVelocity.Unit
+	local strafeDirection = Vector3.new(-direction.Z, 0, direction.X).Unit
 
-	local desiredPosition = calculateDesiredPosition(direction, targetPosition, targetDistance, time, perpendicularDirection)
+	local strafeFrequency = 4  -
+	local strafeAmplitude = 3  
+	local strafeOffset = strafeDirection * math.sin(time * strafeFrequency) * strafeAmplitude
+
+	local desiredPosition = targetPosition - direction * targetDistance + strafeOffset
 
 	local moveDirection = (desiredPosition - startPosition).Unit
 
@@ -267,6 +236,7 @@ local function MoveTo(target, guard)
 	if moveDirection.Z > 0 then keypress(backwardKey) end
 	if moveDirection.X < 0 then keypress(leftKey) end
 	if moveDirection.X > 0 then keypress(rightKey) end
+
 	if distance <= targetDistance + 1 then
 		local speed = 16 * (distance / targetDistance)
 		LocalPlayer.Character.Humanoid.WalkSpeed = math.max(1, math.min(16, speed))
@@ -278,7 +248,7 @@ local function MoveTo(target, guard)
 		click()
 	end
 
-	return true  -- everything went fine
+	return true 
 end
 
 local function toggle(_, state)
