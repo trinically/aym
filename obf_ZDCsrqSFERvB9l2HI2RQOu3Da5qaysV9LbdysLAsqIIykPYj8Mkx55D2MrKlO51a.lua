@@ -15,7 +15,7 @@
 ]]
 
 -- Property of iluminance
--- Copyright © 2025
+-- Copyright Â© 2025
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -82,6 +82,14 @@ local originalZigzagFrequency = CONFIG.ZIGZAG_FREQUENCY
 local originalZigzagAmplitude = CONFIG.ZIGZAG_AMPLITUDE
 local originalAimSpeed        = CONFIG.AIM_SPEED
 local lastClick               = 0
+
+local function isSitting(target)
+	return target:FindFirstChildOfClass("Humanoid") and target:FindFirstChildOfClass("Humanoid").Sit
+end
+
+local function getWalkSpeed(target)
+	return target:FindFirstChildOfClass("Humanoid") and target:FindFirstChildOfClass("Humanoid").WalkSpeed or 0
+end
 
 local function isVisible(target)
 	if not target then
@@ -209,11 +217,52 @@ local function isFirstPerson()
 			(camera.CFrame.Position - LocalPlayer.Character.Head.Position).Magnitude <= 1)
 end
 
+
+local function sidestep(char, dir)
+	if workspace.DistributedGameTime - lastSidestep < CONFIG.SIDESTEP_COOLDOWN then 
+		return 
+	end
+
+	maneuvering             = true
+	local sideDir           = Vector3.new(-dir.Z, 0, dir.X).Unit
+	local pos               = char.PrimaryPart.Position + sideDir * CONFIG.SIDESTEP_DISTANCE
+
+	char.Humanoid:MoveTo(pos)
+
+	lastSidestep            = workspace.DistributedGameTime
+
+	task.delay(CONFIG.SIDESTEP_DURATION, function()
+		maneuvering         = false
+	end)
+end
+
+local function escape(char)
+
+	print("escaping")
+	if workspace.DistributedGameTime - lastEscape < CONFIG.ESCAPE_COOLDOWN then 
+		return 
+	end
+
+	maneuvering             = true
+	local escapeDir         = -char.PrimaryPart.CFrame.LookVector
+	local pos               = char.PrimaryPart.Position + escapeDir * CONFIG.ESCAPE_DISTANCE
+
+	char.Humanoid:MoveTo(pos)
+	char.Humanoid.Jump      = true
+
+	lastEscape              = workspace.DistributedGameTime
+
+	task.delay(CONFIG.ESCAPE_DURATION, function()
+		maneuvering         = false
+	end)
+end
+
 local function click()
 	local now = workspace.DistributedGameTime
 	local actualCPS = CONFIG.CPS + math.random(-CONFIG.CPS_VARIATION, CONFIG.CPS_VARIATION)
 	local clickInterval = 1 / actualCPS
 	if now - lastClick >= clickInterval then
+		--script.Parent.cps.Clicked.Value = not script.Parent.cps.Clicked.Value
 		mouse1click()
 		lastClick = now
 	end
@@ -227,19 +276,33 @@ local function TeleportTo(target)
 		return 
 	end
 
-	local behindDirection = -target.PrimaryPart.CFrame.LookVector
-	local behindPosition = target.PrimaryPart.Position + behindDirection * CONFIG.TELEPORT_DISTANCE
+	local connection
+	connection = game:GetService("RunService").Heartbeat:Connect(function()
+		if not CONFIG.TELEPORT_MODE then
+			connection:Disconnect()
+			return
+		end
 
-	LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(behindPosition, target.PrimaryPart.Position))
+		local behindDirection = -target.PrimaryPart.CFrame.LookVector
+		local behindPosition = target.PrimaryPart.Position + behindDirection * 4 -- 4 studs behind
 
-	camera.CFrame = CFrame.new(camera.CFrame.Position, target.PrimaryPart.Position)
+		LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(behindPosition, target.PrimaryPart.Position))
+	end)
+
+	return connection
 end
 
 local function MoveTo(target, guard)
 	if not target or not target.PrimaryPart or not LocalPlayer.Character or 
 		not LocalPlayer.Character:FindFirstChild("Humanoid") or 
 		not LocalPlayer.Character.PrimaryPart then 
-		return false  
+		return false  -- no valid target, just return
+	end
+
+	-- if we need to teleport or chill, just do it
+	if CONFIG.TELEPORT_MODE or isSitting(target) or getWalkSpeed(target) >= 20 then
+		TeleportTo(target)
+		return true
 	end
 
 	local time                = workspace.DistributedGameTime
@@ -294,7 +357,7 @@ local function MoveTo(target, guard)
 		click()  -- click if we're close enough to the target
 	end
 
-	return true  
+	return true  -- everything went fine
 end
 
 local function toggle(_, state)
@@ -316,13 +379,10 @@ end
 local function toggleTeleportMode(_, state)
 	if state ~= Enum.UserInputState.Begin then return end
 
-	if target then
-		TeleportTo(target)
-		print("Teleported behind target")
-	else
-		print("No target to teleport to")
-	end
+	CONFIG.TELEPORT_MODE = not CONFIG.TELEPORT_MODE
+	print(CONFIG.TELEPORT_MODE and "Teleport mode enabled" or "Teleport mode disabled")
 end
+
 
 ContextActionService:BindAction(CONFIG.ACTION_NAME, toggle, true, CONFIG.TOGGLE_KEY, Enum.KeyCode.ButtonR3)
 ContextActionService:BindAction(CONFIG.TELEPORT_ACTION_NAME, toggleTeleportMode, true, CONFIG.TELEPORT_TOGGLE_KEY)
@@ -359,16 +419,21 @@ RunService.Heartbeat:Connect(function()
 	end
 
 	if target then
-		MoveTo(target, false)
+		if CONFIG.TELEPORT_MODE then
+			TeleportTo(target)
+		else
+			MoveTo(target, false)
+		end
 	else
-		aimlock()
+		aimlock()  -- aimlock will still run but won't attempt to move
 	end
 
 	character.Humanoid.Jump = true
 
+
 	if isFirstPerson() then
 		coroutine.wrap(aimlock)()
 	else
-		target = nil
+		target = nil -- clear the target if not in first person.
 	end
 end)
