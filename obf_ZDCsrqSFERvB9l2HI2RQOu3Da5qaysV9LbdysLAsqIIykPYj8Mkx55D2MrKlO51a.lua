@@ -269,27 +269,19 @@ local function click()
 end
 
 local function TeleportTo(target)
-	if not LocalPlayer.Character or 
-		not LocalPlayer.Character.PrimaryPart or 
-		not target or 
-		not target.PrimaryPart then 
-		return 
-	end
+    if not LocalPlayer.Character or 
+        not LocalPlayer.Character.PrimaryPart or 
+        not target or 
+        not target.PrimaryPart then 
+        return 
+    end
 
-	local connection
-	connection = game:GetService("RunService").Heartbeat:Connect(function()
-		if not CONFIG.TELEPORT_MODE then
-			connection:Disconnect()
-			return
-		end
+    local behindDirection = -target.PrimaryPart.CFrame.LookVector
+    local behindPosition = target.PrimaryPart.Position + behindDirection * CONFIG.TELEPORT_DISTANCE
 
-		local behindDirection = -target.PrimaryPart.CFrame.LookVector
-		local behindPosition = target.PrimaryPart.Position + behindDirection * 4 -- 4 studs behind
-
-		LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(behindPosition, target.PrimaryPart.Position))
-	end)
-
-	return connection
+    LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(behindPosition, target.PrimaryPart.Position))
+    
+    camera.CFrame = CFrame.new(camera.CFrame.Position, target.PrimaryPart.Position)
 end
 
 local function MoveTo(target, guard)
@@ -377,10 +369,14 @@ local function toggle(_, state)
 end
 
 local function toggleTeleportMode(_, state)
-	if state ~= Enum.UserInputState.Begin then return end
+    if state ~= Enum.UserInputState.Begin then return end
 
-	CONFIG.TELEPORT_MODE = not CONFIG.TELEPORT_MODE
-	print(CONFIG.TELEPORT_MODE and "Teleport mode enabled" or "Teleport mode disabled")
+    if target then
+        TeleportTo(target)
+        print("Teleported behind target")
+    else
+        print("No target to teleport to")
+    end
 end
 
 
@@ -400,40 +396,36 @@ end
 print(string.format("Running aym %s", CONFIG.VERSION))
 
 RunService.Heartbeat:Connect(function()
-	if not CONFIG.ACTIVE then return end
+    if not CONFIG.ACTIVE then return end
 
-	local character = LocalPlayer.Character
-	if not character or not character:FindFirstChild("Humanoid") then return end
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("Humanoid") then return end
 
-	local now = workspace.DistributedGameTime
+    local now = workspace.DistributedGameTime
 
-	local shouldRetarget = now - lastRetarget >= CONFIG.RETARGET_INTERVAL or
-		not target or
-		not target:IsA("Model") or
-		not target:FindFirstChildOfClass("Humanoid") or
-		not isVisible(target)
+    local shouldRetarget = now - lastRetarget >= CONFIG.RETARGET_INTERVAL or
+        not target or
+        not target:IsA("Model") or
+        not target:FindFirstChildOfClass("Humanoid") or
+        not isVisible(target)
 
-	if shouldRetarget then
-		target = getTarget()
-		lastRetarget = now
-	end
+    if shouldRetarget then
+        target = getTarget()
+        lastRetarget = now
+    end
 
-	if target then
-		if CONFIG.TELEPORT_MODE then
-			TeleportTo(target)
-		else
-			MoveTo(target, false)
-		end
-	else
-		aimlock()  -- aimlock will still run but won't attempt to move
-	end
+    if target then
+        MoveTo(target, false)
+    else
+        aimlock()
+    end
 
-	character.Humanoid.Jump = true
+    character.Humanoid.Jump = true
 
-
-	if isFirstPerson() then
-		coroutine.wrap(aimlock)()
-	else
-		target = nil -- clear the target if not in first person.
-	end
+    if isFirstPerson() then
+        coroutine.wrap(aimlock)()
+    else
+        target = nil
+    end
+end)
 end)
