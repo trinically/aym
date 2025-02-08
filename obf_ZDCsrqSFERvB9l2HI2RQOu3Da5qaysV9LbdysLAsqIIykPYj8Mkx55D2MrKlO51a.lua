@@ -301,7 +301,7 @@ RunService.Heartbeat:Connect(function()
 		if CONFIG.TELEPORT_MODE then
 			TeleportTo(target)
 		else
-			MoveTo(target, false)
+		--	MoveTo(target, false)
 		end
 	else
 		aimlock() 
