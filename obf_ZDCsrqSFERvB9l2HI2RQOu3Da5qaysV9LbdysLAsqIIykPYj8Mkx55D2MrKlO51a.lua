@@ -157,8 +157,6 @@ end
 
 createMobileButton()
 
-print("Running Humanized Targeting and Movement Script")
-
 RunService.Heartbeat:Connect(function(deltaTime)
 	if not CONFIG.ACTIVE then
 		return
@@ -189,3 +187,4 @@ RunService.Heartbeat:Connect(function(deltaTime)
 	end
 end)
 
+print("Running aym")
