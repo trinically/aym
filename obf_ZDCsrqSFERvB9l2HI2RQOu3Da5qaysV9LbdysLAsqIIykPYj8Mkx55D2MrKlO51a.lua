@@ -96,7 +96,7 @@ local function moveTarget(dt)
 	rayParams.FilterDescendantsInstances = {char}
 	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 	local ray = workspace:Raycast(checkPos, Vector3.new(0, -50, 0), rayParams)
-	local footOffset = (hum.HipHeight or 0) + CONFIG.FootOffsetAdd
+	local footOffset = (hum.HipHeight or 1.5) + CONFIG.FootOffsetAdd
 	local groundY = ray and (ray.Position.Y + footOffset) or curPos.Y
 	
 	local newY
