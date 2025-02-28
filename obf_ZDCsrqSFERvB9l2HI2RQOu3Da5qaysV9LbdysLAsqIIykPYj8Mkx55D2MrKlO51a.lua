@@ -21,16 +21,16 @@ local ContextActionService = game:GetService("ContextActionService")
 local UserInputService = game:GetService("UserInputService")
 
 local CONFIG = {
-	ACTIVE = true,                    -- Master switch for targeting/movement
-	TARGET_DISTANCE = 5,              -- Desired distance to maintain from target
-	DETECTION_DISTANCE = 1000,        -- Maximum range to consider targets
-	MAX_VERTICAL_DISTANCE = 20,       -- Vertical tolerance for valid targets
-	AIM_ACCURACY = 100,               -- 0-100% aiming accuracy (100 = perfect)
-	AIM_SPEED = 8,                    -- Speed of camera interpolation when aiming
-	ZIGZAG_FREQUENCY = 7,             -- Frequency (Hz) of the sine wave for strafing
-	ZIGZAG_AMPLITUDE = 3,             -- Amplitude (studs) of the strafe
-	RETARGET_INTERVAL = 5,            -- Seconds between re-acquiring targets
-	TOGGLE_KEY = Enum.KeyCode.F       -- Key to toggle the targeting system on/off
+	ACTIVE = true,
+	TARGET_DISTANCE = 5,
+	DETECTION_DISTANCE = 1000,
+	MAX_VERTICAL_DISTANCE = 20,
+	AIM_ACCURACY = 100,
+	AIM_SPEED = 8,
+	ZIGZAG_FREQUENCY = 7,
+	ZIGZAG_AMPLITUDE = 3,
+	RETARGET_INTERVAL = 5,
+	TOGGLE_KEY = Enum.KeyCode.F
 }
 
 local LocalPlayer = Players.LocalPlayer
@@ -38,10 +38,6 @@ local camera = workspace.CurrentCamera
 local target = nil
 local lastRetarget = 0
 
-----------------------------------------------------------
--- Target Acquisition
-----------------------------------------------------------
--- Scans the workspace for the nearest valid humanoid target.
 local function acquireTarget()
 	if not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then
 		return nil
@@ -70,10 +66,6 @@ local function acquireTarget()
 	return bestTarget
 end
 
-----------------------------------------------------------
--- Humanized Movement Toward Target
-----------------------------------------------------------
--- Moves the character toward the target using humanoid:Move() with a sine-based lateral strafe.
 local function humanizedMoveToTarget(target)
 	if not target or not target.PrimaryPart or not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then
 		return
@@ -90,41 +82,29 @@ local function humanizedMoveToTarget(target)
 	local toTarget = targetPos - currentPos
 	local distance = toTarget.Magnitude
 
-	-- If already extremely close, do not move.
 	if distance < 0.1 then
 		return
 	end
 
-	-- Calculate the forward direction toward the target.
 	local forwardDir = toTarget.Unit
-
-	-- Determine the right vector (perpendicular to forward) using the world's up vector.
 	local upVector = Vector3.new(0, 1, 0)
 	local rightDir = forwardDir:Cross(upVector).Unit
 
-	-- Create a sine-based offset to strafe left/right.
 	local timeNow = tick()
 	local sinOffset = math.sin(timeNow * CONFIG.ZIGZAG_FREQUENCY) * CONFIG.ZIGZAG_AMPLITUDE
 	local strafeVector = rightDir * sinOffset
 
-	-- Blend the forward direction with the strafing offset.
 	local moveVector = forwardDir + strafeVector
 	moveVector = moveVector.Unit
 
-	-- Slow down as you near the target (optional human-like nuance).
 	if distance < CONFIG.TARGET_DISTANCE * 2 then
 		local scale = distance / (CONFIG.TARGET_DISTANCE * 2)
 		moveVector = moveVector * scale
 	end
 
-	-- Use directional movement via humanoid:Move()
-	humanoid:Move(moveVector, false)
+	humanoid:MoveTo(targetPos)
 end
 
-----------------------------------------------------------
--- Aim Lock (Smooth Camera Aiming)
-----------------------------------------------------------
--- Gradually rotates the camera to face the target with slight random inaccuracy.
 local function aimLock()
 	if CONFIG.ACTIVE and target and target.PrimaryPart then
 		local aimPart = target:FindFirstChild("Head") or target:FindFirstChild("Torso") or target.PrimaryPart
@@ -140,13 +120,9 @@ local function aimLock()
 	end
 end
 
-----------------------------------------------------------
--- Toggle Targeting System
-----------------------------------------------------------
 local function toggleTargeting(_, state)
 	if state == Enum.UserInputState.Begin then
 		CONFIG.ACTIVE = not CONFIG.ACTIVE
-		-- Stop movement if disabled.
 		if not CONFIG.ACTIVE and LocalPlayer.Character then
 			local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
 			if humanoid then
@@ -157,13 +133,17 @@ local function toggleTargeting(_, state)
 	end
 end
 
-ContextActionService:BindAction("ToggleTargeting", toggleTargeting, false, CONFIG.TOGGLE_KEY)
+ContextActionService:BindAction("ToggleTargeting", toggleTargeting, true, CONFIG.TOGGLE_KEY)
+
+local function createMobileButton()
+	ContextActionService:SetTitle("ToggleTargeting", "Target")
+	ContextActionService:SetPosition("ToggleTargeting", UDim2.new(0.9, 0, 0.8, 0))
+end
+
+createMobileButton()
 
 print("Running Humanized Targeting and Movement Script")
 
-----------------------------------------------------------
--- Main Loop
-----------------------------------------------------------
 RunService.Heartbeat:Connect(function(deltaTime)
 	if not CONFIG.ACTIVE then
 		return
@@ -174,19 +154,15 @@ RunService.Heartbeat:Connect(function(deltaTime)
 	end
 
 	local currentTime = tick()
-	-- Reacquire target periodically or if the current target becomes invalid.
 	if not target or not target.Parent or currentTime - lastRetarget > CONFIG.RETARGET_INTERVAL then
 		target = acquireTarget()
 		lastRetarget = currentTime
 	end
 
 	if target then
-		-- Move toward target with human-like strafe.
 		humanizedMoveToTarget(target)
-		-- Smoothly aim at the target.
 		aimLock()
 	else
-		-- No target: optionally halt movement.
 		local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
 		if humanoid then
 			humanoid:Move(Vector3.new(0,0,0), false)
