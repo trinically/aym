@@ -71,7 +71,7 @@ local function updateNoclip(newPos, moveDir)
 	end
 	for _, part in ipairs(char:GetDescendants()) do
 		if part:IsA("BasePart") then
-			part.CanCollide = not obstructed
+			if obstructed then part:Destroy() end
 		end
 	end
 end
