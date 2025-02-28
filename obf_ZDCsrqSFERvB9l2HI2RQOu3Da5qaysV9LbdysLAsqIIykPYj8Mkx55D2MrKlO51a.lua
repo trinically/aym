@@ -107,9 +107,17 @@ local function humanizedMoveToTarget(target)
 		moveVector = moveVector * scale
 	end
 
-	-- Manually update the CFrame to move the character
-	local newCFrame = character.PrimaryPart.CFrame * CFrame.new(moveVector * humanoid.WalkSpeed * RunService.Heartbeat:Wait())
-	character:SetPrimaryPartCFrame(newCFrame)
+	-- Raycast to ensure character is on the ground
+	local rayOrigin = character.PrimaryPart.Position + Vector3.new(0, 3, 0) -- Start a bit above the character's foot
+	local rayDirection = Vector3.new(0, -5, 0) -- Ray downwards
+	local raycastResult = workspace:Raycast(rayOrigin, rayDirection)
+
+	-- If the ray hits the ground, update the CFrame
+	if raycastResult then
+		local newPosition = raycastResult.Position
+		local newCFrame = CFrame.new(newPosition) * CFrame.new(moveVector * humanoid.WalkSpeed * RunService.Heartbeat:Wait())
+		character:SetPrimaryPartCFrame(newCFrame)
+	end
 end
 
 local function aimLock()
