@@ -211,7 +211,9 @@ RunService.Heartbeat:Connect(function(dt)
 			hum:Move(Vector3.new(0, 0, 0), false)
 		end
 	end
-	
+
+	keypress(0x57)
+	keyrelease(0x57)
 	activateTool()
 end)
 
