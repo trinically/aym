@@ -156,6 +156,7 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 RunService.Heartbeat:Connect(function(dt)
+			activateTool()
 	if not CONFIG.Active then return end
 	if not player.Character or not player.Character.PrimaryPart then return end
 	local now = tick()
@@ -170,5 +171,4 @@ RunService.Heartbeat:Connect(function(dt)
 		local hum = player.Character:FindFirstChildOfClass("Humanoid")
 		if hum then hum:Move(Vector3.new(0,0,0), false) end
 	end
-	activateTool()
 end)
