@@ -30,13 +30,16 @@ local CONFIG = {
 	ZIGZAG_FREQUENCY = 7,
 	ZIGZAG_AMPLITUDE = 3,
 	RETARGET_INTERVAL = 5,
-	TOGGLE_KEY = Enum.KeyCode.F
+	TOGGLE_KEY = Enum.KeyCode.F,
+	CPS = 20,
+	CPS_VARIATION = 2
 }
 
 local LocalPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 local target = nil
 local lastRetarget = 0
+local lastClick = 0
 
 local function acquireTarget()
 	if not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then
@@ -120,6 +123,16 @@ local function aimLock()
 	end
 end
 
+local function clickLogic()
+	local now = tick()
+	local actualCPS = CONFIG.CPS + math.random(-CONFIG.CPS_VARIATION, CONFIG.CPS_VARIATION)
+	local clickInterval = 1 / actualCPS
+	if now - lastClick >= clickInterval then
+		mouse1click()
+		lastClick = now
+	end
+end
+
 local function toggleTargeting(_, state)
 	if state == Enum.UserInputState.Begin then
 		CONFIG.ACTIVE = not CONFIG.ACTIVE
@@ -162,6 +175,10 @@ RunService.Heartbeat:Connect(function(deltaTime)
 	if target then
 		humanizedMoveToTarget(target)
 		aimLock()
+
+		if (LocalPlayer.Character.PrimaryPart.Position - target.PrimaryPart.Position).Magnitude <= 20 then
+			clickLogic()
+		end
 	else
 		local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
 		if humanoid then
