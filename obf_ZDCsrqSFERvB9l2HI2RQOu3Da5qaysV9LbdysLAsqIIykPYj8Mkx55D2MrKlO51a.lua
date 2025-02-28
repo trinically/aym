@@ -1,194 +1,159 @@
 --!nocheck
-
---[[ 
-                  ___       ___           ___                       ___           ___           ___           ___           ___     
-      ___        /\__\     /\__\         /\__\          ___        /\__\         /\  \         /\__\         /\  \         /\  \    
-     /\  \      /:/  /    /:/  /        /::|  |        /\  \      /::|  |       /::\  \       /::|  |       /::\  \       /::\  \   
-     \:\  \    /:/  /    /:/  /        /:|:|  |        \:\  \    /:|:|  |      /:/\:\  \     /:|:|  |      /:/\:\  \     /:/\:\  \  
-     /::\__\  /:/  /    /:/  /  ___   /:/|:|__|__      /::\__\  /:/|:|  |__   /::\~\:\  \   /:/|:|  |__   /:/  \:\  \   /::\~\:\  \ 
-  __/:/\/__/ /:/__/    /:/__/  /\__\ /:/ |::::\__\  __/:/\/__/ /:/ |:| /\__\ /:/\:\ \:\__\ /:/ |:| /\__\ /:/__/ \:\__\ /:/\:\ \:\__\
- /\/:/  /    \:\  \    \:\  \ /:/  / \/__/~~/:/  / /\/:/  /    \/__|:|/:/  / \/__\:\/:/  / \/__|:|/:/  / \:\  \  \/__/ \:\~\:\ \/__/
- \::/__/      \:\  \    \:\  /:/  /        /:/  /  \::/__/         |:/:/  /       \::/  /      |:/:/  /   \:\  \        \:\ \:\__\  
-  \:\__\       \:\  \    \:\/:/  /        /:/  /    \:\__\         |::/  /        /:/  /       |::/  /     \:\  \        \:\ \/__/  
-   \/__/        \:\__\    \::/  /        /:/  /      \/__/         /:/  /        /:/  /        /:/  /       \:\__\        \:\__\    
-                 \/__/     \/__/         \/__/                     \/__/         \/__/         \/__/         \/__/         \/__/  
-]]
-
--- Property of iluminance
--- Copyright Â© 2025
+-- Fully redone walker system
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
-local UserInputService = game:GetService("UserInputService")
 
 local CONFIG = {
-	ACTIVE = true,
-	TARGET_DISTANCE = 5,
-	DETECTION_DISTANCE = 1000,
-	MAX_VERTICAL_DISTANCE = 20,
-	AIM_ACCURACY = 100,
-	AIM_SPEED = 8,
-	ZIGZAG_FREQUENCY = 7,
-	ZIGZAG_AMPLITUDE = 3,
-	RETARGET_INTERVAL = 5,
-	TOGGLE_KEY = Enum.KeyCode.F,
-	CPS = 20,
-	CPS_VARIATION = 2
+	Active      = true,
+	TargetDist  = 5,
+	DetectDist  = 1000,
+	MaxVert   = 20,
+	AimAcc      = 100,
+	AimSpd      = 8,
+	ZigFreq     = 7,
+	ZigAmp      = 3,
+	RetargetInt = 5,
+	ToggleKey   = Enum.KeyCode.F
 }
 
-local LocalPlayer = Players.LocalPlayer
-local camera = workspace.CurrentCamera
-local target = nil
+local player      = Players.LocalPlayer
+local cam         = workspace.CurrentCamera
+local target      = nil
 local lastRetarget = 0
-local lastClick = 0
 
-local function acquireTarget()
-	if not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then
+-- Scans the workspace for the nearest valid target
+local function getTarget()
+	if not player.Character or not player.Character.PrimaryPart then
 		return nil
 	end
 
-	local bestTarget = nil
-	local bestDistance = CONFIG.DETECTION_DISTANCE
-	local playerPos = LocalPlayer.Character.PrimaryPart.Position
+	local bestTarg = nil
+	local bestDist = CONFIG.DetectDist
+	local pos = player.Character.PrimaryPart.Position
 
-	for _, model in ipairs(workspace:GetDescendants()) do
-		if model:IsA("Model") and model ~= LocalPlayer.Character then
-			local humanoid = model:FindFirstChildOfClass("Humanoid")
-			if humanoid and humanoid.Health > 0 then
-				local primary = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
-				if primary then
-					local d = (primary.Position - playerPos).Magnitude
-					local verticalDiff = math.abs(primary.Position.Y - playerPos.Y)
-					if d < bestDistance and verticalDiff <= CONFIG.MAX_VERTICAL_DISTANCE then
-						bestDistance = d
-						bestTarget = model
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj:IsA("Model") and obj ~= player.Character then
+			local hum = obj:FindFirstChildOfClass("Humanoid")
+			if hum and hum.Health > 0 then
+				local prim = obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart")
+				if prim then
+					local diff = prim.Position - pos
+					local d = diff.Magnitude
+					if d < bestDist and math.abs(diff.Y) <= CONFIG.MaxVert then
+						bestDist = d
+						bestTarg = obj
 					end
 				end
 			end
 		end
 	end
-	return bestTarget
+
+	return bestTarg
 end
 
-local function humanizedMoveToTarget(target)
-	if not target or not target.PrimaryPart or not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then
+-- Moves the character towards the target using CFrame, staying on the ground.
+local function moveTarget(dt)
+	if not target or not target.PrimaryPart or not player.Character or not player.Character.PrimaryPart then
 		return
 	end
 
-	local character = LocalPlayer.Character
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid then
-		return
-	end
+	local char = player.Character
+	local hrp  = char.PrimaryPart
+	local hum  = char:FindFirstChildOfClass("Humanoid")
+	if not hum then return end
 
-	local currentPos = character.PrimaryPart.Position
-	local targetPos = target.PrimaryPart.Position
-	local toTarget = targetPos - currentPos
-	local distance = toTarget.Magnitude
+	local curPos = hrp.Position
+	local tarPos = target.PrimaryPart.Position
 
-	if distance < 0.1 then
-		return
-	end
+	-- Only consider horizontal movement
+	local diff = Vector3.new(tarPos.X - curPos.X, 0, tarPos.Z - curPos.Z)
+	local dist = diff.Magnitude
+	if dist < 0.1 then return end
 
-	local forwardDir = toTarget.Unit
-	local upVector = Vector3.new(0, 1, 0)
-	local rightDir = forwardDir:Cross(upVector).Unit
+	local forward = diff.Unit
+	local right   = forward:Cross(Vector3.new(0, 1, 0)).Unit
 
+	-- Apply zigzag offset
 	local timeNow = tick()
-	local sinOffset = math.sin(timeNow * CONFIG.ZIGZAG_FREQUENCY) * CONFIG.ZIGZAG_AMPLITUDE
-	local strafeVector = rightDir * sinOffset
+	local offset  = math.sin(timeNow * CONFIG.ZigFreq) * CONFIG.ZigAmp
+	local moveDir = (forward + right * offset).Unit
 
-	local moveVector = forwardDir + strafeVector
-	moveVector = moveVector.Unit
-
-	if distance < CONFIG.TARGET_DISTANCE * 2 then
-		local scale = distance / (CONFIG.TARGET_DISTANCE * 2)
-		moveVector = moveVector * scale
+	-- Slow down when near the target
+	local scale = 1
+	if dist < CONFIG.TargetDist * 2 then
+		scale = dist / (CONFIG.TargetDist * 2)
 	end
 
-	-- Manually update the CFrame to move the character
-	local newCFrame = character.PrimaryPart.CFrame * CFrame.new(moveVector * humanoid.WalkSpeed * RunService.Heartbeat:Wait())
-	character:SetPrimaryPartCFrame(newCFrame)
+	local speed = hum.WalkSpeed * scale
+	local step  = moveDir * speed * dt
 
+	-- Keep the Y position constant so the character stays on the ground
+	local newPos = curPos + Vector3.new(step.X, 0, step.Z)
+	hrp.CFrame = CFrame.new(newPos, newPos + forward)
 end
 
-
+-- Adjusts the camera to aim at the target with a slight inaccuracy.
 local function aimLock()
-	if CONFIG.ACTIVE and target and target.PrimaryPart then
-		local aimPart = target:FindFirstChild("Head") or target:FindFirstChild("Torso") or target.PrimaryPart
-		local targetPos = aimPart.Position
-		local inaccuracyFactor = (100 - CONFIG.AIM_ACCURACY) / 100
-		local randomOffset = Vector3.new(
-			math.random(-10, 10) * inaccuracyFactor / 100,
-			math.random(-10, 10) * inaccuracyFactor / 100,
-			math.random(-10, 10) * inaccuracyFactor / 100
-		)
-		local desiredCF = CFrame.new(camera.CFrame.Position, targetPos + randomOffset)
-		camera.CFrame = camera.CFrame:Lerp(desiredCF, CONFIG.AIM_SPEED / 10)
+	if not CONFIG.Active or not target or not target.PrimaryPart then
+		return
 	end
+
+	local aimPart = target:FindFirstChild("Head") or target:FindFirstChild("Torso") or target.PrimaryPart
+	local tarPos  = aimPart.Position
+	local inacc   = (100 - CONFIG.AimAcc) / 100
+	local randOff = Vector3.new(
+		math.random(-10, 10) * inacc / 100,
+		math.random(-10, 10) * inacc / 100,
+		math.random(-10, 10) * inacc / 100
+	)
+
+	local desired = CFrame.new(cam.CFrame.Position, tarPos + randOff)
+	cam.CFrame = cam.CFrame:Lerp(desired, CONFIG.AimSpd / 10)
 end
 
-local function clickLogic()
-	local now = tick()
-	local actualCPS = CONFIG.CPS + math.random(-CONFIG.CPS_VARIATION, CONFIG.CPS_VARIATION)
-	local clickInterval = 1 / actualCPS
-	if now - lastClick >= clickInterval then
-		mouse1click()
-		lastClick = now
-	end
-end
-
-local function toggleTargeting(_, state)
+-- Toggles the walker system on/off.
+local function toggleTarget(_, state)
 	if state == Enum.UserInputState.Begin then
-		CONFIG.ACTIVE = not CONFIG.ACTIVE
-		if not CONFIG.ACTIVE and LocalPlayer.Character then
-			local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-			if humanoid then
-				humanoid:Move(Vector3.new(0,0,0), false)
+		CONFIG.Active = not CONFIG.Active
+		if not CONFIG.Active and player.Character then
+			local hum = player.Character:FindFirstChildOfClass("Humanoid")
+			if hum then
+				hum:Move(Vector3.new(0, 0, 0), false)
 			end
 		end
-		print(CONFIG.ACTIVE and "Targeting enabled" or "Targeting disabled")
-
-		-- Enable walking when targeting is enabled
-		if CONFIG.ACTIVE then
-			humanizedMoveToTarget(target)
-		end
+		print(CONFIG.Active and "Targeting enabled" or "Targeting disabled")
 	end
 end
 
-ContextActionService:BindAction("ToggleTargeting", toggleTargeting, true, CONFIG.TOGGLE_KEY)
+ContextActionService:BindAction("ToggleTarget", toggleTarget, true, CONFIG.ToggleKey)
+ContextActionService:SetTitle("ToggleTarget", "Target")
+ContextActionService:SetPosition("ToggleTarget", UDim2.new(0.5, 0, 0.5, 0))
 
-ContextActionService:SetTitle("ToggleTargeting", "Target")
-ContextActionService:SetPosition("ToggleTargeting", UDim2.new(0.5, 0, 0.5, 0))
-
-
-RunService.Heartbeat:Connect(function(deltaTime)
-	if not CONFIG.ACTIVE then
+-- Main update loop
+RunService.Heartbeat:Connect(function(dt)
+	if not CONFIG.Active then
 		return
 	end
 
-	if not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then
+	if not player.Character or not player.Character.PrimaryPart then
 		return
 	end
 
-	local currentTime = tick()
-	if not target or not target.Parent or currentTime - lastRetarget > CONFIG.RETARGET_INTERVAL then
-		target = acquireTarget()
-		lastRetarget = currentTime
+	local now = tick()
+	if not target or not target.Parent or now - lastRetarget > CONFIG.RetargetInt then
+		target = getTarget()
+		lastRetarget = now
 	end
 
 	if target then
-		humanizedMoveToTarget(target)
+		moveTarget(dt)
 		aimLock()
-
-		if (LocalPlayer.Character.PrimaryPart.Position - target.PrimaryPart.Position).Magnitude <= 20 then
-			--clickLogic()
-		end
 	else
-		local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			humanoid:Move(Vector3.new(0,0,0), false)
+		local hum = player.Character:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum:Move(Vector3.new(0, 0, 0), false)
 		end
 	end
 end)
