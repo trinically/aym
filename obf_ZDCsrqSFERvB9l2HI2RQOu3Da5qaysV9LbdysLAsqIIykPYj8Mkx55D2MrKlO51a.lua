@@ -1,5 +1,5 @@
 --!nocheck
--- Fully redone Minecraft PvP bot walker with flanking and tool activation
+-- Fully redone Minecraft PvP bot walker with selective flanking and vertical movement
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -14,10 +14,10 @@ local CONFIG = {
 	AimSpd      = 8,
 	ZigFreq     = 7,
 	ZigAmp      = 3,
-	FlankInt    = 2,   -- seconds between flanking direction changes
-	FlankAmp    = 3,   -- additional lateral offset for flanking
+	FlankInt    = 2,   -- seconds between flanking switches
+	FlankAmp    = 3,   -- extra lateral offset when flanking
 	RetargetInt = 5,
-	AvoidDist   = 4,   -- raycast length for obstacle detection
+	ChaseThresh = 7,   -- if horizontal distance is below this, disable flanking
 	ToggleKey   = Enum.KeyCode.F
 }
 
@@ -30,7 +30,7 @@ local lastRetarget = 0
 local lastFlankSwitch = tick()
 local currentFlankDir = 1  -- 1 for right, -1 for left
 
--- Scans the workspace for the nearest valid target.
+-- Finds the nearest valid humanoid target.
 local function getTarget()
 	if not player.Character or not player.Character.PrimaryPart then
 		return nil
@@ -39,7 +39,7 @@ local function getTarget()
 	local bestTarg = nil
 	local bestDist = CONFIG.DetectDist
 	local pos = player.Character.PrimaryPart.Position
-
+	
 	for _, obj in ipairs(workspace:GetDescendants()) do
 		if obj:IsA("Model") and obj ~= player.Character then
 			local hum = obj:FindFirstChildOfClass("Humanoid")
@@ -59,8 +59,9 @@ local function getTarget()
 	return bestTarg
 end
 
--- Moves the character toward the target using CFrame, incorporating zigzag and flanking,
--- and uses raycasts to avoid obstacles.
+-- Moves the character toward the target.
+-- If the horizontal distance is at least ChaseThresh, flanking (zigzag plus lateral offset) is applied.
+-- Also, vertical movement is incorporated so that if the target is elevated the bot will climb.
 local function moveTarget(dt)
 	if not target or not target.PrimaryPart or not player.Character or not player.Character.PrimaryPart then
 		return
@@ -73,61 +74,52 @@ local function moveTarget(dt)
 	
 	local curPos = hrp.Position
 	local tarPos = target.PrimaryPart.Position
+	local diff   = tarPos - curPos
+	local horiz  = Vector3.new(diff.X, 0, diff.Z)
+	local horizDist = horiz.Magnitude
 	
-	-- Compute horizontal vector to target.
-	local diff = Vector3.new(tarPos.X - curPos.X, 0, tarPos.Z - curPos.Z)
-	local dist = diff.Magnitude
-	if dist < 0.1 then return end
+	local moveDir
 	
-	local forward = diff.Unit
-	local right   = forward:Cross(Vector3.new(0, 1, 0)).Unit
-	
-	local timeNow = tick()
-	-- Update flanking direction every FlankInt seconds.
-	if timeNow - lastFlankSwitch > CONFIG.FlankInt then
-		currentFlankDir = math.random(0, 1) == 0 and -1 or 1
-		lastFlankSwitch = timeNow
-	end
-	
-	-- Combine zigzag and flanking offsets.
-	local zigzag = math.sin(timeNow * CONFIG.ZigFreq) * CONFIG.ZigAmp
-	local flank  = currentFlankDir * CONFIG.FlankAmp
-	local lateral = right * (zigzag + flank)
-	local moveDir = (forward + lateral).Unit
-	
-	-- Obstacle avoidance via raycasts.
-	local rayParams = RaycastParams.new()
-	rayParams.FilterDescendantsInstances = {player.Character}
-	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-	
-	local forwardHit = workspace:Raycast(curPos, moveDir * CONFIG.AvoidDist, rayParams)
-	if forwardHit then
-		local candLeft = (moveDir + right * 0.5).Unit
-		local leftHit  = workspace:Raycast(curPos, candLeft * CONFIG.AvoidDist, rayParams)
-		local candRight = (moveDir - right * 0.5).Unit
-		local rightHit  = workspace:Raycast(curPos, candRight * CONFIG.AvoidDist, rayParams)
-		if not leftHit then
-			moveDir = candLeft
-		elseif not rightHit then
-			moveDir = candRight
+	-- If very close horizontally, chase directly (including vertical movement)
+	if horizDist < CONFIG.ChaseThresh then
+		moveDir = diff.Unit
+	else
+		-- Compute horizontal direction and right vector.
+		local forward = horiz.Unit
+		local right   = forward:Cross(Vector3.new(0, 1, 0)).Unit
+		
+		local timeNow = tick()
+		-- Switch flanking direction every FlankInt seconds.
+		if timeNow - lastFlankSwitch > CONFIG.FlankInt then
+			currentFlankDir = (math.random(0, 1) == 0) and -1 or 1
+			lastFlankSwitch = timeNow
 		end
+		
+		local zigzag = math.sin(timeNow * CONFIG.ZigFreq) * CONFIG.ZigAmp
+		local flank  = currentFlankDir * CONFIG.FlankAmp
+		local lateral = right * (zigzag + flank)
+		local horizontalDir = (forward + lateral).Unit
+		
+		-- Combine horizontal direction with vertical adjustment.
+		-- The vertical component is taken from the actual difference.
+		local verticalFactor = diff.Y / math.max(horizDist, 0.001)
+		moveDir = Vector3.new(horizontalDir.X, verticalFactor, horizontalDir.Z).Unit
 	end
 	
-	-- Slow down near target.
+	-- Optionally slow down near target.
 	local scale = 1
-	if dist < CONFIG.TargetDist * 2 then
-		scale = dist / (CONFIG.TargetDist * 2)
+	if horizDist < CONFIG.TargetDist * 2 then
+		scale = horizDist / (CONFIG.TargetDist * 2)
 	end
 	
 	local speed = hum.WalkSpeed * scale
 	local step  = moveDir * speed * dt
+	local newPos = curPos + step
 	
-	-- Update position with constant Y.
-	local newPos = curPos + Vector3.new(step.X, 0, step.Z)
 	hrp.CFrame = CFrame.new(newPos, newPos + moveDir)
 end
 
--- Adjusts the camera to aim at the target with slight inaccuracy.
+-- Smoothly adjusts the camera to aim at the target with slight inaccuracy.
 local function aimLock()
 	if not CONFIG.Active or not target or not target.PrimaryPart then
 		return
@@ -145,7 +137,7 @@ local function aimLock()
 	cam.CFrame = cam.CFrame:Lerp(desired, CONFIG.AimSpd / 10)
 end
 
--- Activates any held tool on every heartbeat.
+-- Activates any held tool every heartbeat.
 local function activateTool()
 	if player.Character then
 		local tool = player.Character:FindFirstChildWhichIsA("Tool")
@@ -155,7 +147,7 @@ local function activateTool()
 	end
 end
 
--- Toggle the system on/off.
+-- Toggles the system on/off.
 local function toggleTarget(_, state)
 	if state == Enum.UserInputState.Begin then
 		CONFIG.Active = not CONFIG.Active
@@ -211,9 +203,7 @@ RunService.Heartbeat:Connect(function(dt)
 			hum:Move(Vector3.new(0, 0, 0), false)
 		end
 	end
-
-	keypress(0x57)
-	keyrelease(0x57)
+	
 	activateTool()
 end)
 
