@@ -108,14 +108,15 @@ local function humanizedMoveToTarget(target)
 	end
 
 	-- Raycast to ensure character is on the ground
-	local rayOrigin = character.PrimaryPart.Position + Vector3.new(0, 3, 0) -- Start a bit above the character's foot
-	local rayDirection = Vector3.new(0, -5, 0) -- Ray downwards
+	local rayOrigin = character.PrimaryPart.Position + Vector3.new(0, 3, 0) -- Start above the foot
+	local rayDirection = Vector3.new(0, -10, 0) -- Ray going downward
 	local raycastResult = workspace:Raycast(rayOrigin, rayDirection)
 
-	-- If the ray hits the ground, update the CFrame
+	-- If the ray hits the ground, update the CFrame to make sure the character stays on the ground
 	if raycastResult then
-		local newPosition = raycastResult.Position
-		local newCFrame = CFrame.new(newPosition) * CFrame.new(moveVector * humanoid.WalkSpeed * RunService.Heartbeat:Wait())
+		local groundPosition = raycastResult.Position
+		local newCFrame = CFrame.new(groundPosition) * CFrame.new(moveVector * humanoid.WalkSpeed * RunService.Heartbeat:Wait())
+		-- Adjust to ensure we move in the direction of the target while staying grounded
 		character:SetPrimaryPartCFrame(newCFrame)
 	end
 end
