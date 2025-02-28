@@ -13,8 +13,8 @@ local CONFIG = {
 	RetargetInt = 5,
 	ToggleKey = Enum.KeyCode.F,
 	ClimbRate = 8,
-	ClimbThreshold = 15, -- difference above ground to start climbing
-	FootOffsetAdd = -0.5   -- additional studs to keep the character above ground
+	ClimbThreshold = 15,
+	FootOffsetAdd = 0
 }
 
 local player = Players.LocalPlayer
@@ -47,6 +47,35 @@ local function getTarget()
 	return bestTarg
 end
 
+local function updateNoclip(newPos, moveDir)
+	local char = player.Character
+	if not char then return end
+	local parts = {}
+	local head = char:FindFirstChild("Head")
+	local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+	local leg = char:FindFirstChild("Left Leg") or char:FindFirstChild("LeftUpperLeg") or char:FindFirstChild("LeftLowerLeg")
+	if head then table.insert(parts, head) end
+	if torso then table.insert(parts, torso) end
+	if leg then table.insert(parts, leg) end
+	local rayParams = RaycastParams.new()
+	rayParams.FilterDescendantsInstances = {char}
+	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+	local obstructed = false
+	for _, part in ipairs(parts) do
+		local startPos = part.Position
+		local ray = workspace:Raycast(startPos, moveDir * 2, rayParams)
+		if ray and ray.Instance and not ray.Instance:IsDescendantOf(char) then
+			obstructed = true
+			break
+		end
+	end
+	for _, part in ipairs(char:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.CanCollide = not obstructed
+		end
+	end
+end
+
 local function moveTarget(dt)
 	if not target or not target.PrimaryPart or not player.Character or not player.Character.PrimaryPart then
 		return
@@ -62,31 +91,26 @@ local function moveTarget(dt)
 	local speed = hum.WalkSpeed
 	local newPos = curPos + moveDir * speed * dt
 	
-	-- Determine ground level using an elevated raycast
 	local checkPos = curPos + Vector3.new(0, 5, 0)
 	local rayParams = RaycastParams.new()
 	rayParams.FilterDescendantsInstances = {char}
 	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 	local ray = workspace:Raycast(checkPos, Vector3.new(0, -50, 0), rayParams)
-	local footOffset = (hum.HipHeight or 2) + CONFIG.FootOffsetAdd
-	local groundY = ray and (ray.Position.Y + footOffset) or (curPos.Y)
+	local footOffset = (hum.HipHeight or 0) + CONFIG.FootOffsetAdd
+	local groundY = ray and (ray.Position.Y + footOffset) or curPos.Y
 	
-	-- If the target is significantly above ground level, climb; otherwise, stick to ground.
 	local newY
-	if tarPos.Y > groundY + CONFIG.ClimbThreshold then
-		newY = math.min(curPos.Y + CONFIG.ClimbRate * dt, tarPos.Y + footOffset)
+	if tarPos.Y - curPos.Y >= CONFIG.ClimbThreshold then
+		newY = math.min(curPos.Y + CONFIG.ClimbRate * dt, tarPos.Y)
 	else
 		newY = groundY
 	end
-	
 	newPos = Vector3.new(newPos.X, newY, newPos.Z)
-	local lookDir = Vector3.new(diff.X, 0, diff.Z)
-	if lookDir.Magnitude == 0 then
-		lookDir = Vector3.new(0, 0, 1)
-	else
-		lookDir = lookDir.Unit
-	end
+	local lookDir = (tarPos - curPos)
+	lookDir = Vector3.new(lookDir.X, 0, lookDir.Z)
+	lookDir = lookDir.Magnitude > 0 and lookDir.Unit or Vector3.new(0, 0, 1)
 	hrp.CFrame = CFrame.new(newPos, newPos + lookDir)
+	updateNoclip(newPos, moveDir)
 end
 
 local function aimLock()
@@ -104,9 +128,7 @@ end
 local function activateTool()
 	if player.Character then
 		local tool = player.Character:FindFirstChildWhichIsA("Tool")
-		if tool then
-			pcall(function() tool:Activate() end)
-		end
+		if tool then pcall(function() tool:Activate() end) end
 	end
 end
 
@@ -134,12 +156,8 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 RunService.Heartbeat:Connect(function(dt)
-	if not CONFIG.Active then
-		return
-	end
-	if not player.Character or not player.Character.PrimaryPart then
-		return
-	end
+	if not CONFIG.Active then return end
+	if not player.Character or not player.Character.PrimaryPart then return end
 	local now = tick()
 	if not target or not target.Parent or now - lastRetarget > CONFIG.RetargetInt then
 		target = getTarget()
@@ -150,9 +168,7 @@ RunService.Heartbeat:Connect(function(dt)
 		aimLock()
 	else
 		local hum = player.Character:FindFirstChildOfClass("Humanoid")
-		if hum then
-			hum:Move(Vector3.new(0,0,0), false)
-		end
+		if hum then hum:Move(Vector3.new(0,0,0), false) end
 	end
 	activateTool()
 end)
