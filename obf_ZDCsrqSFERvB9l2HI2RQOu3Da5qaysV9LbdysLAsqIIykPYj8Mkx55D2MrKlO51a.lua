@@ -75,30 +75,32 @@ local function moveTarget(dt)
 	
 	local curPos = hrp.Position
 	local tarPos = target.PrimaryPart.Position
-	
-	-- Determine ground level via a downward raycast.
+
+	-- Ground detection via raycast
 	local rayParams = RaycastParams.new()
-	rayParams.FilterDescendantsInstances = {player.Character}
+	rayParams.FilterDescendantsInstances = {char}
 	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-	local ray = workspace:Raycast(curPos, Vector3.new(0, -1000, 0), rayParams)
-	local groundY = ray and ray.Position.Y or curPos.Y
-	
-	-- Compute horizontal difference.
+	local groundCheck = workspace:Raycast(curPos, Vector3.new(0, -10, 0), rayParams)
+
+	-- Adjust ground level using HipHeight
+	local hipHeight = hum.HipHeight or 2
+	local groundY = groundCheck and (groundCheck.Position.Y + hipHeight) or curPos.Y
+
+	-- Compute horizontal movement
 	local diff = tarPos - curPos
 	local horiz = Vector3.new(diff.X, 0, diff.Z)
 	local horizDist = horiz.Magnitude
 	
 	local moveDir
 	if horizDist < CONFIG.ChaseThresh then
-		-- Direct chase when close: use full diff (vertical will be overridden later if not climbing).
+		-- Direct chase when close
 		moveDir = diff.Unit
 	else
-		-- Flanking movement with zigzag and lateral offset.
+		-- Flanking behavior
 		local forward = horiz.Unit
 		local right = forward:Cross(Vector3.new(0, 1, 0)).Unit
 		
 		local timeNow = tick()
-		-- Switch flanking direction periodically.
 		if timeNow - lastFlankSwitch > CONFIG.FlankInt then
 			currentFlankDir = (math.random(0,1) == 0) and -1 or 1
 			lastFlankSwitch = timeNow
@@ -109,38 +111,33 @@ local function moveTarget(dt)
 		local lateral = right * (zigzag + flank)
 		local horizontalDir = (forward + lateral).Unit
 		
-		-- Incorporate vertical difference into the movement direction.
-		local verticalFactor = diff.Y / math.max(horizDist, 0.001)
+		-- Incorporate vertical difference smoothly
+		local verticalFactor = diff.Y / math.max(horizDist, 1)
 		moveDir = Vector3.new(horizontalDir.X, verticalFactor, horizontalDir.Z).Unit
 	end
 	
-	-- Determine new Y position.
+	-- Adjust Y-level (climbing if needed)
 	local targetY = tarPos.Y
 	local newY
 	if targetY > groundY + 15 then
-		-- Climb gradually: interpolate current Y toward targetY.
-		newY = curPos.Y + (targetY - curPos.Y) * (CONFIG.ClimbRate * dt)
+		newY = math.clamp(curPos.Y + CONFIG.ClimbRate * dt, curPos.Y, targetY)
 	else
-		-- Stay on ground.
 		newY = groundY
 	end
-	
-	-- Calculate horizontal step (vertical is handled separately).
+
+	-- Horizontal step calculation
 	local horizontalStep = Vector3.new(moveDir.X, 0, moveDir.Z) * hum.WalkSpeed * dt
 	local newPos = curPos + horizontalStep
 	newPos = Vector3.new(newPos.X, newY, newPos.Z)
-	
-	-- Adjust look direction.
-	local lookDir = moveDir
-	if targetY <= groundY + 15 then
-		-- When not climbing, look purely horizontally.
-		lookDir = Vector3.new(moveDir.X, 0, moveDir.Z)
-		if lookDir.Magnitude > 0 then
-			lookDir = lookDir.Unit
-		end
+
+	-- Look direction adjustment
+	local lookDir = Vector3.new(moveDir.X, 0, moveDir.Z)
+	if lookDir.Magnitude > 0 then
+		lookDir = lookDir.Unit
 	end
 	
-	hrp.CFrame = CFrame.new(newPos, newPos + lookDir)
+	-- Apply movement smoothly
+	hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(newPos, newPos + lookDir), 0.3)
 end
 
 -- Smoothly adjusts the camera to aim at the target with slight inaccuracy.
