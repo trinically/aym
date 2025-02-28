@@ -107,8 +107,10 @@ local function humanizedMoveToTarget(target)
 		moveVector = moveVector * scale
 	end
 
-	humanoid:MoveTo(targetPos)
+	local newCFrame = character.PrimaryPart.CFrame * CFrame.new(moveVector * humanoid.WalkSpeed * RunService.Heartbeat:Wait())
+	character:SetPrimaryPartCFrame(newCFrame)
 end
+
 
 local function aimLock()
 	if CONFIG.ACTIVE and target and target.PrimaryPart then
