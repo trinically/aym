@@ -150,12 +150,9 @@ end
 
 ContextActionService:BindAction("ToggleTargeting", toggleTargeting, true, CONFIG.TOGGLE_KEY)
 
-local function createMobileButton()
-	ContextActionService:SetTitle("ToggleTargeting", "Target")
-	ContextActionService:SetPosition("ToggleTargeting", UDim2.new(0.9, 0, 0.8, 0))
-end
+ContextActionService:SetTitle("ToggleTargeting", "Target")
+ContextActionService:SetPosition("ToggleTargeting", UDim2.new(0.5, 0, 0.5, 0))
 
-createMobileButton()
 
 RunService.Heartbeat:Connect(function(deltaTime)
 	if not CONFIG.ACTIVE then
