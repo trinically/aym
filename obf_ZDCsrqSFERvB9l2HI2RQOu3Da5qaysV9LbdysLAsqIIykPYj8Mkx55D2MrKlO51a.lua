@@ -110,7 +110,9 @@ local function humanizedMoveToTarget(target)
 	-- Manually update the CFrame to move the character
 	local newCFrame = character.PrimaryPart.CFrame * CFrame.new(moveVector * humanoid.WalkSpeed * RunService.Heartbeat:Wait())
 	character:SetPrimaryPartCFrame(newCFrame)
+
 end
+
 
 local function aimLock()
 	if CONFIG.ACTIVE and target and target.PrimaryPart then
