@@ -14,7 +14,7 @@ local CONFIG = {
 	ToggleKey = Enum.KeyCode.F,
 	ClimbRate = 8,
 	ClimbThreshold = 15, -- difference above ground to start climbing
-	FootOffsetAdd = 0.5   -- additional studs to keep the character above ground
+	FootOffsetAdd = -0.5   -- additional studs to keep the character above ground
 }
 
 local player = Players.LocalPlayer
