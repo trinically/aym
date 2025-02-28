@@ -47,33 +47,53 @@ local function getTarget()
 	return bestTarg
 end
 
+-- Updated noclip handler:
+-- • If an obstruction is detected from either the head or torso,
+--   we compute its horizontal distance relative to the character’s HRP.
+-- • If that distance is less than 2 studs and the hit is below, we treat it as a platform (keep collision true).
+-- • Otherwise, for obstructions ahead or above, we disable collision (and hide it) and adjust the target Y
+--   so that your character’s HRP is teleported above the obstacle.
 local function updateNoclip(newPos, moveDir)
 	local char = player.Character
-	if not char then return end
-	local parts = {}
-	local head = char:FindFirstChild("Head")
-	local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
-	local leg = char:FindFirstChild("Left Leg") or char:FindFirstChild("LeftUpperLeg") or char:FindFirstChild("LeftLowerLeg")
-	if head then table.insert(parts, head) end
-	if torso then table.insert(parts, torso) end
-	if leg then table.insert(parts, leg) end
+	if not char then return newPos end
+	local hrp = char.PrimaryPart
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local footOffset = (hum and hum.HipHeight or 2.8) + CONFIG.FootOffsetAdd
+	
 	local rayParams = RaycastParams.new()
 	rayParams.FilterDescendantsInstances = {char}
 	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-	local obstructed = false
-	for _, part in ipairs(parts) do
-		local startPos = part.Position
-		local ray = workspace:Raycast(startPos, moveDir * 2, rayParams)
+	
+	-- Check from key points (head and torso)
+	local checkPoints = {}
+	local head = char:FindFirstChild("Head")
+	local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+	if head then table.insert(checkPoints, head.Position) end
+	if torso then table.insert(checkPoints, torso.Position) end
+
+	for _, point in ipairs(checkPoints) do
+		local ray = workspace:Raycast(point, moveDir * 2, rayParams)
 		if ray and ray.Instance and not ray.Instance:IsDescendantOf(char) then
-			obstructed = true
-			break
+			local hitPart = ray.Instance
+			local hitPos = ray.Position
+			-- Calculate horizontal (XZ) distance between HRP and the hit point.
+			local horizontalDist = Vector3.new(hitPos.X - hrp.Position.X, 0, hitPos.Z - hrp.Position.Z).Magnitude
+			-- If the hit is directly below (within 2 studs horizontally and below HRP), treat as platform.
+			if horizontalDist < 2 and (hrp.Position.Y - hitPos.Y) > 0 then
+				hitPart.CanCollide = true
+			else
+				-- For obstructions ahead or above, disable collision and hide the part.
+				hitPart.CanCollide = false
+				hitPart.Transparency = 1
+				-- Adjust newPos so your character is teleported above the obstacle.
+				-- We assume the obstacle’s top is at hitPart.Position.Y plus half its size.
+				local partTop = hitPart.Position.Y + (hitPart.Size.Y / 2)
+				newPos = Vector3.new(newPos.X, partTop + footOffset, newPos.Z)
+			end
 		end
 	end
-	for _, part in ipairs(char:GetDescendants()) do
-		if part:IsA("BasePart") then
-			part.CanCollide = not obstructed
-		end
-	end
+
+	return newPos
 end
 
 local function moveTarget(dt)
@@ -84,13 +104,15 @@ local function moveTarget(dt)
 	local hrp = char.PrimaryPart
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	if not hum then return end
+
 	local curPos = hrp.Position
 	local tarPos = target.PrimaryPart.Position
 	local diff = tarPos - curPos
 	local moveDir = diff.Unit
 	local speed = hum.WalkSpeed
 	local newPos = curPos + moveDir * speed * dt
-	
+
+	-- Determine ground level using a downward raycast from above current position.
 	local checkPos = curPos + Vector3.new(0, 5, 0)
 	local rayParams = RaycastParams.new()
 	rayParams.FilterDescendantsInstances = {char}
@@ -98,7 +120,7 @@ local function moveTarget(dt)
 	local ray = workspace:Raycast(checkPos, Vector3.new(0, -50, 0), rayParams)
 	local footOffset = (hum.HipHeight or 2.8) + CONFIG.FootOffsetAdd
 	local groundY = ray and (ray.Position.Y + footOffset) or curPos.Y
-	
+
 	local newY
 	if tarPos.Y - curPos.Y >= CONFIG.ClimbThreshold then
 		newY = math.min(curPos.Y + CONFIG.ClimbRate * dt, tarPos.Y)
@@ -106,11 +128,14 @@ local function moveTarget(dt)
 		newY = groundY
 	end
 	newPos = Vector3.new(newPos.X, newY, newPos.Z)
+	
+	-- Adjust newPos based on potential obstructions.
+	newPos = updateNoclip(newPos, moveDir)
+	
 	local lookDir = (tarPos - curPos)
 	lookDir = Vector3.new(lookDir.X, 0, lookDir.Z)
 	lookDir = lookDir.Magnitude > 0 and lookDir.Unit or Vector3.new(0, 0, 1)
 	hrp.CFrame = CFrame.new(newPos, newPos + lookDir)
-	updateNoclip(newPos, moveDir)
 end
 
 local function aimLock()
@@ -156,7 +181,7 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 RunService.Heartbeat:Connect(function(dt)
-			activateTool()
+	activateTool()
 	if not CONFIG.Active then return end
 	if not player.Character or not player.Character.PrimaryPart then return end
 	local now = tick()
