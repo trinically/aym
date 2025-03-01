@@ -88,7 +88,7 @@ local function isLineOfSightClear(startPos, endPos, ignoreList)
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
 	rayParams.FilterDescendantsInstances = ignoreList or {}
 	local rayResult = workspace:Raycast(startPos, (endPos - startPos), rayParams)
-	
+
 	return true
 end
 
@@ -145,31 +145,55 @@ local function performAction()
 	local now = workspace.DistributedGameTime
 	local actualCPS = CONFIG.CPS + math.random(-CONFIG.CPS_VARIATION, CONFIG.CPS_VARIATION)
 	local actionInterval = 1 / actualCPS
+
 	if now - performActionLast < actionInterval then
 		return
 	end
-	local isBuilding = false
-	if target and target.PrimaryPart then
-		local currentTargetY = target.PrimaryPart.Position.Y
-		if lastTargetY and (currentTargetY - lastTargetY) > 5 then
-			isBuilding = true
-		end
-		lastTargetY = currentTargetY
-	end
+
 	local tool
-	if isBuilding then
-		tool = getToolBySlot(3)
-	else
-		tool = getToolBySlot(1)
-	end
-	if tool then
-		if not tool.Parent or tool.Parent ~= Character then
-			Character.Humanoid:EquipTool(tool)
-		end
-		tool:Activate()
-		performActionLast = now
-	end
+	
+	tool = getToolBySlot(1)
+
+	tool:Activate()
+	performActionLast = now
 end
+
+--local function performAction()
+--	local Character   = LocalPlayer.Character
+--	local now = workspace.DistributedGameTime
+--	local actualCPS = CONFIG.CPS + math.random(-CONFIG.CPS_VARIATION, CONFIG.CPS_VARIATION)
+--	local actionInterval = 1 / actualCPS
+	
+--	if now - performActionLast < actionInterval then
+--		return
+--	end
+	
+--	local isBuilding = false
+	
+--	if target and target.PrimaryPart then
+--		local currentTargetY = target.PrimaryPart.Position.Y
+--		if lastTargetY and (currentTargetY - lastTargetY) > 5 then
+--			isBuilding = true
+--		end
+--		lastTargetY = currentTargetY
+--	end
+	
+--	local tool
+	
+--	if isBuilding then
+--		tool = getToolBySlot(3)
+--	else
+--		tool = getToolBySlot(1)
+--	end
+	
+--	if tool then
+--		if not tool.Parent or tool.Parent ~= Character then
+--			Character.Humanoid:EquipTool(tool)
+--		end
+--		tool:Activate()
+--		performActionLast = now
+--	end
+--end
 
 local function TellyBridge(target)
 	local Character   = LocalPlayer.Character
@@ -239,31 +263,31 @@ local function MoveTo(target)
 	local currentPos = Character.PrimaryPart.Position
 	local targetPos  = target.PrimaryPart.Position
 	local verticalDiff = targetPos.Y - currentPos.Y
-	
+
 	--if verticalDiff > 3 then
 	--	TellyBridge(target)
 	--	return true
 	--end
-	
+
 	local direction = (targetPos - currentPos).Unit
 	local timeNow = workspace.DistributedGameTime
 	local strafeDir = Vector3.new(-direction.Z, 0, direction.X)
 	local strafeOffset = strafeDir * (math.sin(timeNow * CONFIG.ZIGZAG_FREQUENCY + math.rad(math.random(0,360))) * CONFIG.ZIGZAG_AMPLITUDE)
 	local randomOffset = Vector3.new(math.random(-1,1), 0, math.random(-1,1))
 	local desiredPosition = targetPos - direction * CONFIG.TARGET_DISTANCE + strafeOffset + randomOffset
-	
+
 	if not lastDestination or (lastDestination - desiredPosition).Magnitude > 1 then
 		humanoid:MoveTo(desiredPosition)
 		lastDestination = desiredPosition
 	end
 	humanoid.WalkSpeed = 16
-	
+
 	local distance = (targetPos - currentPos).Magnitude
-	
+
 	if distance <= CONFIG.CLICK_RANGE then
 		performAction()
 	end
-	
+
 	return true
 end
 
@@ -320,25 +344,25 @@ RunService.Heartbeat:Connect(function()
 		lastRetarget = now
 	end
 	local currentHealth = Character.Humanoid.Health
-	
+
 	if lastHealth and currentHealth < lastHealth then
 		bridging = false
 		if target then aimlock() end
 	end
-	
+
 	lastHealth = currentHealth
-	
+
 	if target then
 		MoveTo(target)
 		aimlock()
 	else
 		camera.CameraType = Enum.CameraType.Custom
 	end
-	
+
 	--if bridging and target then
 	--	TellyBridge(target)
 	--end
-	
+
 	Character.Humanoid.Jump = true
 	coroutine.wrap(aimlock)()
 end)
