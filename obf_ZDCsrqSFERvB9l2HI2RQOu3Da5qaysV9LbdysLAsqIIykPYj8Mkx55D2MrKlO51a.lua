@@ -67,7 +67,7 @@ local function moveTarget(dt)
 		else
 			newY = tarPos.Y + 3
 		end
-		hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(newPos.X, newY, newPos.Z, tarPos.X, newY, tarPos.Z), 0.1)
+		hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(newPos, Vector3.new(tarPos.X, newY, tarPos.Z)), 0.1)
 	else
 		local angle = math.rad(math.random(0, 360))
 		local offset = Vector3.new(math.cos(angle) * CONFIG.TargetDist, 3, math.sin(angle) * CONFIG.TargetDist)
