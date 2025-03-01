@@ -67,17 +67,17 @@ local function moveTarget(dt)
 		else
 			newY = tarPos.Y + 3
 		end
-		hrps.CFrame = hrp.CFrame:Lerp(CFrame.new(newPos.X, newY, newPos.Z, tarPos.X, newY, tarPos.Z), 0.1)
+		hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(newPos.X, newY, newPos.Z, tarPos.X, newY, tarPos.Z), 0.1)
 	else
 		local angle = math.rad(math.random(0, 360))
 		local offset = Vector3.new(math.cos(angle) * CONFIG.TargetDist, 3, math.sin(angle) * CONFIG.TargetDist)
 		local blinkPos = Vector3.new(tarPos.X + offset.X, tarPos.Y + 3, tarPos.Z + offset.Z)
-		hrps.CFrame = CFrame.new(blinkPos, Vector3.new(tarPos.X, blinkPos.Y, tarPos.Z))
+		hrp.CFrame = CFrame.new(blinkPos, Vector3.new(tarPos.X, blinkPos.Y, tarPos.Z))
 	end
 
-	hrps.Velocity = Vector3.zero
-	hrps.AssemblyLinearVelocity = Vector3.zero
-	hrps.AssemblyAngularVelocity = Vector3.zero
+	hrp.Velocity = Vector3.zero
+	hrp.AssemblyLinearVelocity = Vector3.zero
+	hrp.AssemblyAngularVelocity = Vector3.zero
 end
 
 local function aimLock()
