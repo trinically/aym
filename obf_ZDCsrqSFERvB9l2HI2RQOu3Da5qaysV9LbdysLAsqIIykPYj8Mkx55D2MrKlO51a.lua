@@ -30,17 +30,14 @@ local CONFIG = {
 	DETECTION_DISTANCE    = 1000,
 	AIM_SPEED             = 8,
 	AIM_ACCURACY          = 100,
-
 	ACTIVE                = true,
 	TELEPORT_MODE         = false, 
 	WALL_DETECTION        = true,
 	EXCLUDE_NPCS          = false,
 	EXCLUDE_PLAYERS       = false,
 	EXCLUDE_TEAMMATES     = false,
-
 	TOGGLE_KEY            = Enum.KeyCode.F,
 	TELEPORT_TOGGLE_KEY   = Enum.KeyCode.Q,
-
 	VERSION               = "v1.3 Gamesense fixed",
 	ACTION_NAME           = "ToggleAimston",
 	RETARGET_INTERVAL     = 5,
@@ -67,6 +64,7 @@ local lastTargetY = nil
 local bridging = false
 local lastHealth = nil
 local performActionLast = 0
+local lastDestination = nil
 
 local function getToolBySlot(slot)
 	local tools = {}
@@ -137,17 +135,22 @@ local function getAimPart(target)
 end
 
 local function aimlock()
-	if CONFIG.ACTIVE and target and target.PrimaryPart then
+	if CONFIG.ACTIVE and target and target.PrimaryPart and LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
 		local part = getAimPart(target)
 		if part then
+			local bulletSpeed = 200
 			local distance = (target.PrimaryPart.Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
+			local predictionTime = distance / bulletSpeed
+			local targetVelocity = target.PrimaryPart.Velocity or Vector3.new(0, 0, 0)
+			local predictedPos = part.Position + targetVelocity * predictionTime
 			local inaccuracy = (100 - CONFIG.AIM_ACCURACY) / 100
 			local offset = Vector3.new(
 				math.random(-10, 10) * inaccuracy / 100,
 				math.random(-10, 10) * inaccuracy / 100,
 				math.random(-10, 10) * inaccuracy / 100
 			)
-			local cf = CFrame.new(camera.CFrame.Position, offset)
+			local aimPos = predictedPos + offset
+			local cf = CFrame.new(camera.CFrame.Position, aimPos)
 			camera.CFrame = camera.CFrame:Lerp(cf, CONFIG.AIM_SPEED / 10)
 		end
 	end
@@ -241,7 +244,7 @@ local function TeleportTo(target)
 end
 
 local function MoveTo(target)
-	if not target or not target.PrimaryPart or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") or not LocalPlayer.Character.PrimaryPart then
+	if not target or not target.PrimaryPart or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") then
 		return false
 	end
 	local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
@@ -267,7 +270,10 @@ local function MoveTo(target)
 			desiredPosition = targetPos - direction * CONFIG.TARGET_DISTANCE + strafeDir * CONFIG.ZIGZAG_AMPLITUDE
 		end
 	end
-	humanoid:MoveTo(desiredPosition)
+	if not lastDestination or (lastDestination - desiredPosition).Magnitude > 1 then
+		humanoid:MoveTo(desiredPosition)
+		lastDestination = desiredPosition
+	end
 	humanoid.WalkSpeed = 16
 	local distance = (targetPos - currentPos).Magnitude
 	if math.abs(distance - CONFIG.TARGET_DISTANCE) <= CONFIG.CLICK_RANGE then
@@ -341,8 +347,6 @@ RunService.Heartbeat:Connect(function()
 	if bridging and target then
 		TellyBridge(target)
 	end
-	if math.random() < 0.05 then
-		character.Humanoid.Jump = true
-	end
+	character.Humanoid.Jump = true
 	coroutine.wrap(aimlock)()
 end)
