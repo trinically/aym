@@ -30,7 +30,6 @@ local CONFIG = {
 	DETECTION_DISTANCE    = 1000,
 	AIM_SPEED             = 8,
 	AIM_ACCURACY          = 100,
-	BULLET_SPEED          = 200, -- predictive aiming
 
 	ACTIVE                = true,
 	TELEPORT_MODE         = false, 
@@ -61,7 +60,7 @@ local CONFIG = {
 	},
 }
 
-local LocalPlayer = clonedPlayers.LocalPlayer
+local LocalPlayer = cloneref(clonedPlayers.LocalPlayer)
 local camera      = workspace.CurrentCamera
 local target, lastRetarget = nil, 0
 local lastTargetY = nil
@@ -125,7 +124,7 @@ local function getAimPart(target)
 		Head  = target:FindFirstChild("Head"),
 		Torso = target:FindFirstChild("UpperTorso") or target:FindFirstChild("Torso"),
 		Legs  = target:FindFirstChild("LeftLeg") or target:FindFirstChild("RightLeg")
-		        or target:FindFirstChild("LeftFoot") or target:FindFirstChild("RightFoot"),
+			or target:FindFirstChild("LeftFoot") or target:FindFirstChild("RightFoot"),
 	}
 	local heightDifference = camera.CFrame.Position.Y - target.PrimaryPart.Position.Y
 	if heightDifference > 2 then
@@ -141,19 +140,14 @@ local function aimlock()
 	if CONFIG.ACTIVE and target and target.PrimaryPart then
 		local part = getAimPart(target)
 		if part then
-			local bulletSpeed = CONFIG.BULLET_SPEED
 			local distance = (target.PrimaryPart.Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
-			local predictionTime = distance / bulletSpeed
-			local targetVelocity = target.PrimaryPart.Velocity or Vector3.new(0, 0, 0)
-			local predictedPos = part.Position + targetVelocity * predictionTime
 			local inaccuracy = (100 - CONFIG.AIM_ACCURACY) / 100
 			local offset = Vector3.new(
 				math.random(-10, 10) * inaccuracy / 100,
 				math.random(-10, 10) * inaccuracy / 100,
 				math.random(-10, 10) * inaccuracy / 100
 			)
-			local aimPos = predictedPos + offset
-			local cf = CFrame.new(camera.CFrame.Position, aimPos)
+			local cf = CFrame.new(camera.CFrame.Position, offset)
 			camera.CFrame = camera.CFrame:Lerp(cf, CONFIG.AIM_SPEED / 10)
 		end
 	end
@@ -274,13 +268,8 @@ local function MoveTo(target)
 		end
 	end
 	humanoid:MoveTo(desiredPosition)
+	humanoid.WalkSpeed = 16
 	local distance = (targetPos - currentPos).Magnitude
-	if distance <= CONFIG.TARGET_DISTANCE + 1 then
-		local speed = 16 * (distance / CONFIG.TARGET_DISTANCE)
-		humanoid.WalkSpeed = math.clamp(speed, 1, 16)
-	else
-		humanoid.WalkSpeed = 16
-	end
 	if math.abs(distance - CONFIG.TARGET_DISTANCE) <= CONFIG.CLICK_RANGE then
 		performAction()
 	end
