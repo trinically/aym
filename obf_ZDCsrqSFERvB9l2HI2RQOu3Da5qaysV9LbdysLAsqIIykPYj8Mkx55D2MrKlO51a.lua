@@ -12,20 +12,8 @@
   \:\__\       \:\  \    \:\/:/  /        /:/  /    \:\__\         |::/  /        /:/  /       |::/  /     \:\  \        \:\ \/__/  
    \/__/        \:\__\    \::/  /        /:/  /      \/__/         /:/  /        /:/  /        /:/  /       \:\__\        \:\__\    
                  \/__/     \/__/         \/__/                     \/__/         \/__/         \/__/         \/__/         \/__/  
+--]]
 
-Script Organization:
-	1. Service Cloning and Configuration
-	2. Utility Functions (Tool Retrieval, Wall Detection)
-	3. Target Acquisition and Predictive Aiming Functions
-	4. Action Function (Attack / Build Up)
-	5. Teleport Functionality
-	6. Gamesense Movement (MoveTo) Function
-	7. Input Toggle Handlers and Bindings
-	8. Main Loop (Heartbeat) with Evasive Considerations
-	9. Tellybridging Camera and Movement Logic
-]]
-
--- 1. Service Cloning and Configuration
 local Players              = game:GetService("Players")
 local UserInputService     = game:GetService("UserInputService")
 local RunService           = game:GetService("RunService")
@@ -79,6 +67,7 @@ local target, lastRetarget = nil, 0
 local lastTargetY = nil
 local bridging = false
 local lastHealth = nil
+local performActionLast = 0
 
 local function getToolBySlot(slot)
 	local tools = {}
@@ -136,7 +125,7 @@ local function getAimPart(target)
 		Head  = target:FindFirstChild("Head"),
 		Torso = target:FindFirstChild("UpperTorso") or target:FindFirstChild("Torso"),
 		Legs  = target:FindFirstChild("LeftLeg") or target:FindFirstChild("RightLeg")
-			or target:FindFirstChild("LeftFoot") or target:FindFirstChild("RightFoot"),
+		        or target:FindFirstChild("LeftFoot") or target:FindFirstChild("RightFoot"),
 	}
 	local heightDifference = camera.CFrame.Position.Y - target.PrimaryPart.Position.Y
 	if heightDifference > 2 then
@@ -174,7 +163,7 @@ local function performAction()
 	local now = workspace.DistributedGameTime
 	local actualCPS = CONFIG.CPS + math.random(-CONFIG.CPS_VARIATION, CONFIG.CPS_VARIATION)
 	local actionInterval = 1 / actualCPS
-	if now - (performAction.last or 0) < actionInterval then
+	if now - performActionLast < actionInterval then
 		return
 	end
 	local isBuilding = false
@@ -187,16 +176,16 @@ local function performAction()
 	end
 	local tool
 	if isBuilding then
-		tool = getToolBySlot(3)  -- Build block tool (3rd hotbar item)
+		tool = getToolBySlot(3)
 	else
-		tool = getToolBySlot(1)  -- Sword (1st hotbar item)
+		tool = getToolBySlot(1)
 	end
 	if tool then
 		if not tool.Parent or tool.Parent ~= LocalPlayer.Character then
 			LocalPlayer.Character.Humanoid:EquipTool(tool)
 		end
 		tool:Activate()
-		performAction.last = now
+		performActionLast = now
 	end
 end
 
@@ -206,14 +195,12 @@ local function TellyBridge(target)
 	local targetPos = target.PrimaryPart.Position
 	local horizontalDiff = Vector3.new(targetPos.X - currentPos.X, 0, targetPos.Z - currentPos.Z)
 	local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
-
 	local backwardDir
 	if horizontalDiff.Magnitude < 2 then
 		backwardDir = Vector3.new(0, 0, 0)
 	else
 		backwardDir = (currentPos - targetPos).Unit
 	end
-
 	local desiredPosition = currentPos
 	if backwardDir.Magnitude > 0 then
 		desiredPosition = currentPos + backwardDir * 3
@@ -223,7 +210,6 @@ local function TellyBridge(target)
 		humanoid:MoveTo(desiredPosition)
 		humanoid.Jump = true
 	end
-
 	local camPos = camera.CFrame.Position
 	local lookPoint
 	if horizontalDiff.Magnitude < 2 then
@@ -234,7 +220,6 @@ local function TellyBridge(target)
 	end
 	local desiredCFrame = CFrame.new(camPos, lookPoint)
 	camera.CFrame = camera.CFrame:Lerp(desiredCFrame, 0.2)
-
 	local tool = getToolBySlot(3)
 	if tool then
 		if not tool.Parent or tool.Parent ~= LocalPlayer.Character then
@@ -255,28 +240,24 @@ local function TeleportTo(target)
 			return
 		end
 		local behindDirection = -target.PrimaryPart.CFrame.LookVector
-		local behindPosition = target.PrimaryPart.Position + behindDirection * 4 -- 4 studs behind
+		local behindPosition = target.PrimaryPart.Position + behindDirection * 4
 		LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(behindPosition, target.PrimaryPart.Position))
 	end)
 	return connection
 end
 
 local function MoveTo(target)
-	if not target or not target.PrimaryPart or not LocalPlayer.Character or 
-		not LocalPlayer.Character:FindFirstChild("Humanoid") or 
-		not LocalPlayer.Character.PrimaryPart then
+	if not target or not target.PrimaryPart or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") or not LocalPlayer.Character.PrimaryPart then
 		return false
 	end
 	local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
 	local currentPos = LocalPlayer.Character.PrimaryPart.Position
 	local targetPos  = target.PrimaryPart.Position
 	local verticalDiff = targetPos.Y - currentPos.Y
-
 	if verticalDiff > 3 then
 		TellyBridge(target)
 		return true
 	end
-
 	local direction = (targetPos - currentPos).Unit
 	local timeNow = workspace.DistributedGameTime
 	local strafeDir = Vector3.new(-direction.Z, 0, direction.X)
@@ -300,7 +281,6 @@ local function MoveTo(target)
 	else
 		humanoid.WalkSpeed = 16
 	end
-
 	if math.abs(distance - CONFIG.TARGET_DISTANCE) <= CONFIG.CLICK_RANGE then
 		performAction()
 	end
@@ -369,7 +349,6 @@ RunService.Heartbeat:Connect(function()
 	else
 		aimlock()
 	end
-
 	if bridging and target then
 		TellyBridge(target)
 	end
