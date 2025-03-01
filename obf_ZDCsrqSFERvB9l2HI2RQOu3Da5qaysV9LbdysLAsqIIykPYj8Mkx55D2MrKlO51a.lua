@@ -158,43 +158,6 @@ local function performAction()
 	performActionLast = now
 end
 
---local function performAction()
---	local Character   = LocalPlayer.Character
---	local now = workspace.DistributedGameTime
---	local actualCPS = CONFIG.CPS + math.random(-CONFIG.CPS_VARIATION, CONFIG.CPS_VARIATION)
---	local actionInterval = 1 / actualCPS
-	
---	if now - performActionLast < actionInterval then
---		return
---	end
-	
---	local isBuilding = false
-	
---	if target and target.PrimaryPart then
---		local currentTargetY = target.PrimaryPart.Position.Y
---		if lastTargetY and (currentTargetY - lastTargetY) > 5 then
---			isBuilding = true
---		end
---		lastTargetY = currentTargetY
---	end
-	
---	local tool
-	
---	if isBuilding then
---		tool = getToolBySlot(3)
---	else
---		tool = getToolBySlot(1)
---	end
-	
---	if tool then
---		if not tool.Parent or tool.Parent ~= Character then
---			Character.Humanoid:EquipTool(tool)
---		end
---		tool:Activate()
---		performActionLast = now
---	end
---end
-
 local function TellyBridge(target)
 	local Character   = LocalPlayer.Character
 	bridging = true
@@ -254,6 +217,7 @@ local function TeleportTo(target)
 	return connection
 end
 
+--[[ 
 local function MoveTo(target)
 	local Character   = LocalPlayer.Character
 	if not target or not target.PrimaryPart or not Character or not Character:FindFirstChild("Humanoid") then
@@ -289,6 +253,55 @@ local function MoveTo(target)
 	end
 
 	return true
+end
+]]--
+
+local function cframewalk(target, dt)
+	local Character = LocalPlayer.Character
+	if not target or not target.PrimaryPart or not Character or not Character.PrimaryPart then
+		return false
+	end
+	
+	local currentPos = Character.PrimaryPart.Position
+	local targetPos = target.PrimaryPart.Position
+
+	local direction = (targetPos - currentPos)
+	if direction.Magnitude == 0 then return true end
+	local dirUnit = direction.Unit
+	
+	local timeNow = workspace.DistributedGameTime
+	local strafeDir = Vector3.new(-dirUnit.Z, 0, dirUnit.X)
+	local strafeOffset = strafeDir * (math.sin(timeNow * CONFIG.ZIGZAG_FREQUENCY + math.rad(math.random(0,360))) * CONFIG.ZIGZAG_AMPLITUDE)
+	local randomOffset = Vector3.new(math.random(-1,1), 0, math.random(-1,1))
+	local desiredPosition = targetPos - dirUnit * CONFIG.TARGET_DISTANCE + strafeOffset + randomOffset
+
+	local moveVector = desiredPosition - currentPos
+	local moveDistance = moveVector.Magnitude
+	if moveDistance < 1 then
+		performAction()
+		return true
+	end
+	local moveDir = moveVector.Unit
+	
+	local speed = Character.Humanoid.WalkSpeed
+	local step = speed * dt
+	if step > moveDistance then step = moveDistance end
+	local newPos = currentPos + moveDir * step
+
+	local rayOrigin = newPos + Vector3.new(0, 5, 0)
+	local rayDirection = Vector3.new(0, -10, 0)
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterDescendantsInstances = {Character}
+	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+	local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+	if rayResult then
+		 newPos = Vector3.new(newPos.X, rayResult.Position.Y, newPos.Z)
+	else
+		 newPos = Vector3.new(newPos.X, currentPos.Y, newPos.Z)
+	end
+
+	local newCFrame = CFrame.new(newPos, newPos + moveDir)
+	Character:SetPrimaryPartCFrame(newCFrame)
 end
 
 local function toggle(_, state)
@@ -333,7 +346,7 @@ end
 
 print(string.char(82,117,110,110,105,110,103,32,97,121,109,32) .. CONFIG.VERSION)
 
-RunService.Heartbeat:Connect(function()
+RunService.Heartbeat:Connect(function(dt)
 	local Character   = LocalPlayer.Character
 	if not CONFIG.ACTIVE then return end
 	if not Character or not Character:FindFirstChild("Humanoid") then return end
@@ -353,7 +366,7 @@ RunService.Heartbeat:Connect(function()
 	lastHealth = currentHealth
 
 	if target then
-		MoveTo(target)
+		cframewalk(target, dt)
 		aimlock()
 	else
 		camera.CameraType = Enum.CameraType.Custom
