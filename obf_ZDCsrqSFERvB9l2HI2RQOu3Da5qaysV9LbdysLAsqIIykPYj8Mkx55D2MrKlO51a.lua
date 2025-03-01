@@ -47,12 +47,6 @@ local function getTarget()
 	return bestTarg
 end
 
--- Updated noclip handler:
--- • If an obstruction is detected from either the head or torso,
---   we compute its horizontal distance relative to the character’s HRP.
--- • If that distance is less than 2 studs and the hit is below, we treat it as a platform (keep collision true).
--- • Otherwise, for obstructions ahead or above, we disable collision (and hide it) and adjust the target Y
---   so that your character’s HRP is teleported above the obstacle.
 local function updateNoclip(newPos, moveDir)
 	local char = player.Character
 	if not char then return newPos end
@@ -76,17 +70,16 @@ local function updateNoclip(newPos, moveDir)
 		if ray and ray.Instance and not ray.Instance:IsDescendantOf(char) then
 			local hitPart = ray.Instance
 			local hitPos = ray.Position
-			-- Calculate horizontal (XZ) distance between HRP and the hit point.
+
 			local horizontalDist = Vector3.new(hitPos.X - hrp.Position.X, 0, hitPos.Z - hrp.Position.Z).Magnitude
-			-- If the hit is directly below (within 2 studs horizontally and below HRP), treat as platform.
+
 			if horizontalDist < 2 and (hrp.Position.Y - hitPos.Y) > 0 then
 				hitPart.CanCollide = true
 			else
-				-- For obstructions ahead or above, disable collision and hide the part.
+
 				hitPart.CanCollide = false
 				hitPart.Transparency = 1
-				-- Adjust newPos so your character is teleported above the obstacle.
-				-- We assume the obstacle’s top is at hitPart.Position.Y plus half its size.
+
 				local partTop = hitPart.Position.Y + (hitPart.Size.Y / 2)
 				newPos = Vector3.new(newPos.X, partTop + footOffset, newPos.Z)
 			end
@@ -112,7 +105,6 @@ local function moveTarget(dt)
 	local speed = hum.WalkSpeed
 	local newPos = curPos + moveDir * speed * dt
 
-	-- Determine ground level using a downward raycast from above current position.
 	local checkPos = curPos + Vector3.new(0, 5, 0)
 	local rayParams = RaycastParams.new()
 	rayParams.FilterDescendantsInstances = {char}
@@ -129,7 +121,7 @@ local function moveTarget(dt)
 	end
 	newPos = Vector3.new(newPos.X, newY, newPos.Z)
 	
-	-- Adjust newPos based on potential obstructions.
+	--  account for obstructions
 	newPos = updateNoclip(newPos, moveDir)
 	
 	local lookDir = (tarPos - curPos)
