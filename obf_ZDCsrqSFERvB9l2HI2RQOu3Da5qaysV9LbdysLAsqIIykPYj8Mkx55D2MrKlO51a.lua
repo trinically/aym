@@ -294,10 +294,12 @@ local function cframewalk(target, dt)
 	raycastParams.FilterDescendantsInstances = {Character}
 	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
 	local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+	
+	local offsetY = Character.PrimaryPart.Size.Y / 2
 	if rayResult then
-		 newPos = Vector3.new(newPos.X, rayResult.Position.Y, newPos.Z)
+		newPos = Vector3.new(newPos.X, rayResult.Position.Y + offsetY, newPos.Z)
 	else
-		 newPos = Vector3.new(newPos.X, currentPos.Y, newPos.Z)
+		newPos = Vector3.new(newPos.X, currentPos.Y, newPos.Z)
 	end
 
 	local newCFrame = CFrame.new(newPos, newPos + moveDir)
