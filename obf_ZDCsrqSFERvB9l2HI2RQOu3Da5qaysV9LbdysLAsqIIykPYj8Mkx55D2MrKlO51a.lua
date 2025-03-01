@@ -1,325 +1,199 @@
+--!nocheck
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local clonedPlayers = cloneref(Players)
-local clonedUserInputService = cloneref(UserInputService)
-local clonedRunService = cloneref(RunService)
-local clonedContextActionService = cloneref(ContextActionService)
-local clonedReplicatedStorage = cloneref(ReplicatedStorage)
 
 local CONFIG = {
-	DETECTION_DISTANCE = 1000,
-	AIM_SPEED = 8,
-	AIM_ACCURACY = 100,
-	ACTIVE = true,
-	TELEPORT_MODE = false,
-	WALL_DETECTION = true,
-	EXCLUDE_NPCS = false,
-	EXCLUDE_PLAYERS = false,
-	EXCLUDE_TEAMMATES = false,
-	TOGGLE_KEY = Enum.KeyCode.F,
-	TELEPORT_TOGGLE_KEY = Enum.KeyCode.Q,
-	VERSION = "v1.3 Gamesense fixed",
-	ACTION_NAME = "ToggleAimston",
-	RETARGET_INTERVAL = 7,
-	ZIGZAG_FREQUENCY = 7,
-	ZIGZAG_AMPLITUDE = 3,
-	JUMP_COOLDOWN = 0.1,
-	TARGET_DISTANCE = 5,
-	MAX_VERTICAL_DISTANCE = 20,
-	CLICK_RANGE = 32,
-	CPS = 50,
-	CPS_VARIATION = 2,
-	TELEPORT_ACTION_NAME = "ToggleTeleportMode",
-	TELEPORT_PATTERN = {
-		AWAY_DISTANCE = 100,
-		RETURN_DISTANCE = 2,
-		COOLDOWN = 0.2,
-	},
+	Active = true,
+	TargetDist = 5,
+	DetectDist = 1000,
+	MaxVert = 20,
+	AimAcc = 100,
+	AimSpd = 8,
+	RetargetInt = 5,
+	ToggleKey = Enum.KeyCode.F,
+	ClimbRate = 8,
+	ClimbThreshold = 15,
+	FootOffsetAdd = 0
 }
 
-local LocalPlayer = clonedPlayers.LocalPlayer
-local camera = workspace.CurrentCamera
-local target, lastRetarget = nil, 0
-local lastTargetY = nil
-local bridging = false
-local lastHealth = nil
-local performActionLast = 0
-local lastDestination = nil
-
-local function getToolBySlot(slot)
-	local Character = LocalPlayer.Character
-	local tools = {}
-	for _, tool in ipairs(Character and Character:GetChildren() or {}) do
-		if tool:IsA("Tool") then
-			table.insert(tools, tool)
-		end
-	end
-	for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
-		if tool:IsA("Tool") then
-			table.insert(tools, tool)
-		end
-	end
-	return tools[slot]
-end
-
-local function isLineOfSightClear(startPos, endPos, ignoreList)
-	local rayParams = RaycastParams.new()
-	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	rayParams.FilterDescendantsInstances = ignoreList or {}
-	local rayResult = workspace:Raycast(startPos, (endPos - startPos), rayParams)
-	return true
-end
+local player = Players.LocalPlayer
+local cam = workspace.CurrentCamera
+local target = nil
+local lastRetarget = 0
 
 local function getTarget()
-	local Character = LocalPlayer.Character
-	if not LocalPlayer or not Character or not Character.PrimaryPart then
-		warn("getTarget: Invalid LocalPlayer or Character")
+	if not player.Character or not player.Character.PrimaryPart then
 		return nil
 	end
-	local closest = nil
-	local maxDist = CONFIG.DETECTION_DISTANCE or 100
-	local playerPosition = Character.PrimaryPart.Position
-	for _, model in pairs(workspace:GetDescendants()) do
-		if not model:IsA("Model") or not model:FindFirstChildOfClass("Humanoid") or model == Character then
-			continue
-		end
-		local part = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
-		if not part then continue end
-		local d = (part.Position - playerPosition).Magnitude
-		local verticalDifference = math.abs(part.Position.Y - playerPosition.Y)
-		if d > maxDist or verticalDifference > CONFIG.MAX_VERTICAL_DISTANCE then continue end
-		local plr = Players:GetPlayerFromCharacter(model)
-		local skipTarget = (plr and CONFIG.EXCLUDE_PLAYERS) or (not plr and CONFIG.EXCLUDE_NPCS) or (plr and CONFIG.EXCLUDE_TEAMMATES and plr.Team == LocalPlayer.Team)
-		if skipTarget then continue end
-		if not closest or d < maxDist then
-			closest, maxDist = model, d
+	local bestTarg, bestDist = nil, CONFIG.DetectDist
+	local pos = player.Character.PrimaryPart.Position
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj:IsA("Model") and obj ~= player.Character then
+			local hum = obj:FindFirstChildOfClass("Humanoid")
+			if hum and hum.Health > 0 then
+				local prim = obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart")
+				if prim then
+					local diff = prim.Position - pos
+					local d = diff.Magnitude
+					if d < bestDist and math.abs(diff.Y) <= CONFIG.MaxVert then
+						bestDist = d
+						bestTarg = obj
+					end
+				end
+			end
 		end
 	end
-	return closest
+	return bestTarg
 end
 
-local function getAimPart(target)
-	if not target or not target:FindFirstChild("Humanoid") then return nil end
-	return target:FindFirstChild("Head") or target.PrimaryPart
-end
+-- Updated noclip handler:
+-- • If an obstruction is detected from either the head or torso,
+--   we compute its horizontal distance relative to the character’s HRP.
+-- • If that distance is less than 2 studs and the hit is below, we treat it as a platform (keep collision true).
+-- • Otherwise, for obstructions ahead or above, we disable collision (and hide it) and adjust the target Y
+--   so that your character’s HRP is teleported above the obstacle.
+local function updateNoclip(newPos, moveDir)
+	local char = player.Character
+	if not char then return newPos end
+	local hrp = char.PrimaryPart
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local footOffset = (hum and hum.HipHeight or 2.8) + CONFIG.FootOffsetAdd
+	
+	local rayParams = RaycastParams.new()
+	rayParams.FilterDescendantsInstances = {char}
+	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+	
+	-- Check from key points (head and torso)
+	local checkPoints = {}
+	local head = char:FindFirstChild("Head")
+	local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+	if head then table.insert(checkPoints, head.Position) end
+	if torso then table.insert(checkPoints, torso.Position) end
 
-local function aimlock()
-	local Character = LocalPlayer.Character
-	if target and target.PrimaryPart and Character and Character.PrimaryPart then
-		local part = getAimPart(target)
-		if part then
-			local aimPos = part.Position
-			local cf = CFrame.new(camera.CFrame.Position, aimPos)
-			camera.CFrame = camera.CFrame:Lerp(cf, CONFIG.AIM_SPEED / 10)
+	for _, point in ipairs(checkPoints) do
+		local ray = workspace:Raycast(point, moveDir * 2, rayParams)
+		if ray and ray.Instance and not ray.Instance:IsDescendantOf(char) then
+			local hitPart = ray.Instance
+			local hitPos = ray.Position
+			-- Calculate horizontal (XZ) distance between HRP and the hit point.
+			local horizontalDist = Vector3.new(hitPos.X - hrp.Position.X, 0, hitPos.Z - hrp.Position.Z).Magnitude
+			-- If the hit is directly below (within 2 studs horizontally and below HRP), treat as platform.
+			if horizontalDist < 2 and (hrp.Position.Y - hitPos.Y) > 0 then
+				hitPart.CanCollide = true
+			else
+				-- For obstructions ahead or above, disable collision and hide the part.
+				hitPart.CanCollide = false
+				hitPart.Transparency = 1
+				-- Adjust newPos so your character is teleported above the obstacle.
+				-- We assume the obstacle’s top is at hitPart.Position.Y plus half its size.
+				local partTop = hitPart.Position.Y + (hitPart.Size.Y / 2)
+				newPos = Vector3.new(newPos.X, partTop + footOffset, newPos.Z)
+			end
 		end
-	else
-		camera.CameraType = Enum.CameraType.Custom
 	end
+
+	return newPos
 end
 
-local function performAction()
-	local Character = LocalPlayer.Character
-	local now = workspace.DistributedGameTime
-	local actualCPS = CONFIG.CPS + math.random(-CONFIG.CPS_VARIATION, CONFIG.CPS_VARIATION)
-	local actionInterval = 1 / actualCPS
-	if now - performActionLast < actionInterval then
+local function moveTarget(dt)
+	if not target or not target.PrimaryPart or not player.Character or not player.Character.PrimaryPart then
 		return
 	end
-	local tool = getToolBySlot(1)
-	tool:Activate()
-	performActionLast = now
+	local char = player.Character
+	local hrp = char.PrimaryPart
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum then return end
+
+	local curPos = hrp.Position
+	local tarPos = target.PrimaryPart.Position
+	local diff = tarPos - curPos
+	local moveDir = diff.Unit
+	local speed = hum.WalkSpeed
+	local newPos = curPos + moveDir * speed * dt
+
+	-- Determine ground level using a downward raycast from above current position.
+	local checkPos = curPos + Vector3.new(0, 5, 0)
+	local rayParams = RaycastParams.new()
+	rayParams.FilterDescendantsInstances = {char}
+	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+	local ray = workspace:Raycast(checkPos, Vector3.new(0, -50, 0), rayParams)
+	local footOffset = (hum.HipHeight or 2.8) + CONFIG.FootOffsetAdd
+	local groundY = ray and (ray.Position.Y + footOffset) or curPos.Y
+
+	local newY
+	if tarPos.Y - curPos.Y >= CONFIG.ClimbThreshold then
+		newY = math.min(curPos.Y + CONFIG.ClimbRate * dt, tarPos.Y)
+	else
+		newY = groundY
+	end
+	newPos = Vector3.new(newPos.X, newY, newPos.Z)
+	
+	-- Adjust newPos based on potential obstructions.
+	newPos = updateNoclip(newPos, moveDir)
+	
+	local lookDir = (tarPos - curPos)
+	lookDir = Vector3.new(lookDir.X, 0, lookDir.Z)
+	lookDir = lookDir.Magnitude > 0 and lookDir.Unit or Vector3.new(0, 0, 1)
+	hrp.CFrame = CFrame.new(newPos, newPos + lookDir)
 end
 
-local function TellyBridge(target)
-	local Character = LocalPlayer.Character
-	bridging = true
-	local currentPos = Character.PrimaryPart.Position
-	local targetPos = target.PrimaryPart.Position
-	local horizontalDiff = Vector3.new(targetPos.X - currentPos.X, 0, targetPos.Z - currentPos.Z)
-	local humanoid = Character:FindFirstChild("Humanoid")
-	local backwardDir
-	if horizontalDiff.Magnitude < 2 then
-		backwardDir = Vector3.new(0, 0, 0)
-	else
-		backwardDir = (currentPos - targetPos).Unit
-	end
-	local desiredPosition = currentPos
-	if backwardDir.Magnitude > 0 then
-		desiredPosition = currentPos + backwardDir * 3
-	end
-	desiredPosition = Vector3.new(desiredPosition.X, targetPos.Y + 3.5, desiredPosition.Z)
-	if humanoid then
-		humanoid:MoveTo(desiredPosition)
-		humanoid.Jump = true
-	end
-	local camPos = camera.CFrame.Position
-	local lookPoint
-	if horizontalDiff.Magnitude < 2 then
-		lookPoint = camPos + Vector3.new(0, -1, 0)
-	else
-		local horizontalComponent = (currentPos - targetPos).Unit
-		lookPoint = camPos + horizontalComponent + Vector3.new(0, -1, 0)
-	end
-	local desiredCFrame = CFrame.new(camPos, lookPoint)
-	camera.CFrame = camera.CFrame:Lerp(desiredCFrame, 0.2)
-	local tool = getToolBySlot(3)
-	if tool then
-		if not tool.Parent or tool.Parent ~= Character then
-			Character.Humanoid:EquipTool(tool)
-		end
-		tool:Activate()
-	end
-end
-
-local function TeleportTo(target)
-	local Character = LocalPlayer.Character
-	if not Character or not Character.PrimaryPart or not target or not target.PrimaryPart then
+local function aimLock()
+	if not CONFIG.Active or not target or not target.PrimaryPart then
 		return
 	end
-	local connection
-	connection = RunService.Heartbeat:Connect(function()
-		if not CONFIG.TELEPORT_MODE then
-			connection:Disconnect()
-			return
-		end
-		local behindDirection = -target.PrimaryPart.CFrame.LookVector
-		local behindPosition = target.PrimaryPart.Position + behindDirection * 4
-		Character:SetPrimaryPartCFrame(CFrame.new(behindPosition, target.PrimaryPart.Position))
-	end)
-	return connection
+	local aimPart = target:FindFirstChild("Head") or target:FindFirstChild("Torso") or target.PrimaryPart
+	local tarPos = aimPart.Position
+	local inacc = (100 - CONFIG.AimAcc) / 100
+	local randOff = Vector3.new(math.random(-10,10)*inacc/100, math.random(-10,10)*inacc/100, math.random(-10,10)*inacc/100)
+	local desired = CFrame.new(cam.CFrame.Position, tarPos + randOff)
+	cam.CFrame = cam.CFrame:Lerp(desired, CONFIG.AimSpd/10)
 end
 
-local function cframewalk(target, dt)
-	local Character = LocalPlayer.Character
-	if not target or not target.PrimaryPart or not Character or not Character.PrimaryPart then return false end
-	local HRP = Character.PrimaryPart
-	local currentPos = HRP.Position
-	local targetPos = target.PrimaryPart.Position
-	local direction = targetPos - currentPos
-	if direction.Magnitude == 0 then return true end
-	local dirUnit = direction.Unit
-	local timeNow = workspace.DistributedGameTime
-	local strafeDir = Vector3.new(-dirUnit.Z, 0, dirUnit.X)
-	local strafeOffset = strafeDir * (math.sin(timeNow * CONFIG.ZIGZAG_FREQUENCY + math.rad(math.random(0,360))) * CONFIG.ZIGZAG_AMPLITUDE)
-	local randomOffset = Vector3.new(math.random(-1,1), 0, math.random(-1,1))
-	local desiredPosition = targetPos - dirUnit * CONFIG.TARGET_DISTANCE + strafeOffset + randomOffset
-	local moveVector = desiredPosition - currentPos
-	local moveDistance = moveVector.Magnitude
-	if moveDistance < 1 then performAction() return true end
-	local moveDir = moveVector.Unit
-	local speed = Character.Humanoid.WalkSpeed
-	local step = speed * dt
-	if step > moveDistance then step = moveDistance end
-	local newPos = currentPos + moveDir * step
-	local baseY = currentPos.Y
-	local newPosH = Vector3.new(newPos.X, baseY, newPos.Z)
-	local newCFrame = CFrame.new(newPosH, newPosH + moveDir)
-	local leftFoot = Character:FindFirstChild("LeftFoot")
-	local rightFoot = Character:FindFirstChild("RightFoot")
-	if leftFoot and rightFoot then
-		local leftLocalOffset = HRP.CFrame:PointToObjectSpace(leftFoot.Position)
-		local rightLocalOffset = HRP.CFrame:PointToObjectSpace(rightFoot.Position)
-		local newLeftPos = newCFrame * leftLocalOffset
-		local newRightPos = newCFrame * rightLocalOffset
-		local leftRayOrigin = newLeftPos + Vector3.new(0,5,0)
-		local rightRayOrigin = newRightPos + Vector3.new(0,5,0)
-		local rayDirection = Vector3.new(0,-10,0)
-		local raycastParams = RaycastParams.new()
-		raycastParams.FilterDescendantsInstances = {Character}
-		raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-		local leftRayResult = workspace:Raycast(leftRayOrigin, rayDirection, raycastParams)
-		local rightRayResult = workspace:Raycast(rightRayOrigin, rayDirection, raycastParams)
-		local requiredY_left = leftRayResult and (leftRayResult.Position.Y - leftLocalOffset.Y) or baseY
-		local requiredY_right = rightRayResult and (rightRayResult.Position.Y - rightLocalOffset.Y) or baseY
-		local requiredHRPY = math.max(requiredY_left, requiredY_right)
-		newPos = Vector3.new(newPos.X, requiredHRPY, newPos.Z)
-		newCFrame = CFrame.new(newPos, newPos + moveDir)
-	else
-		local rayOrigin = newPos + Vector3.new(0,5,0)
-		local rayDirection = Vector3.new(0,-10,0)
-		local raycastParams = RaycastParams.new()
-		raycastParams.FilterDescendantsInstances = {Character}
-		raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-		local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-		local offsetY = HRP.Size.Y/2
-		if rayResult then
-			newPos = Vector3.new(newPos.X, rayResult.Position.Y + offsetY, newPos.Z)
-		else
-			newPos = Vector3.new(newPos.X, currentPos.Y, newPos.Z)
-		end
-		newCFrame = CFrame.new(newPos, newPos + moveDir)
-	end
-	Character:SetPrimaryPartCFrame(newCFrame)
-end
-
-local function toggle(_, state)
-	local Character = LocalPlayer.Character
-	if state ~= Enum.UserInputState.Begin then return end
-	CONFIG.ACTIVE = not CONFIG.ACTIVE
-	target = nil
-	if not CONFIG.ACTIVE and Character then
-		local humanoid = Character:FindFirstChild("Humanoid")
-		if humanoid then
-			humanoid:MoveTo(Character.PrimaryPart.Position)
-		end
-	end
-	if CONFIG.ACTIVE then
-		print(string.char(65,121,109,32,101,110,97,98,108,101,100))
-	else
-		print(string.char(65,121,109,32,100,105,115,97,98,108,101,100))
+local function activateTool()
+	if player.Character then
+		local tool = player.Character:FindFirstChildWhichIsA("Tool")
+		if tool then pcall(function() tool:Activate() end) end
 	end
 end
 
-local function toggleTeleportMode(_, state)
-	if state ~= Enum.UserInputState.Begin then return end
-	CONFIG.TELEPORT_MODE = not CONFIG.TELEPORT_MODE
-	if CONFIG.TELEPORT_MODE then
-		print(string.char(84,101,108,101,112,111,114,116,32,101,110,97,98,108,101,100))
-	else
-		print(string.char(84,101,108,101,112,111,114,116,32,100,105,115,97,98,108,101,100))
+local function toggleTarget(_, state)
+	if state == Enum.UserInputState.Begin then
+		CONFIG.Active = not CONFIG.Active
 	end
 end
 
-ContextActionService:BindAction(CONFIG.ACTION_NAME, toggle, true, CONFIG.TOGGLE_KEY, Enum.KeyCode.ButtonR3)
-ContextActionService:BindAction(CONFIG.TELEPORT_ACTION_NAME, toggleTeleportMode, true, CONFIG.TELEPORT_TOGGLE_KEY)
+ContextActionService:BindAction("ToggleTarget", toggleTarget, true, CONFIG.ToggleKey)
+ContextActionService:SetTitle("ToggleTarget", "Target")
+ContextActionService:SetPosition("ToggleTarget", UDim2.new(0.5,0,0.5,0))
 
-if UserInputService.TouchEnabled then
-	ContextActionService:BindAction(CONFIG.ACTION_NAME, toggle, true)
-	ContextActionService:SetPosition(CONFIG.ACTION_NAME, UDim2.new(1, -280, 0, 10))
-	ContextActionService:SetTitle(CONFIG.ACTION_NAME, "Aym")
-	ContextActionService:BindAction(CONFIG.TELEPORT_ACTION_NAME, toggleTeleportMode, true)
-	ContextActionService:SetPosition(CONFIG.TELEPORT_ACTION_NAME, UDim2.new(1, -280, 0, 70))
-	ContextActionService:SetTitle(CONFIG.TELEPORT_ACTION_NAME, "TP")
+local function onToolAdded(child)
+	if child:IsA("Tool") then
+		pcall(function() child:Activate() end)
+	end
 end
 
-print(string.char(82,117,110,110,105,110,103,32,97,121,109,32) .. CONFIG.VERSION)
+if player.Character then
+	player.Character.ChildAdded:Connect(onToolAdded)
+end
+player.CharacterAdded:Connect(function(char)
+	char.ChildAdded:Connect(onToolAdded)
+end)
 
 RunService.Heartbeat:Connect(function(dt)
-	local Character = LocalPlayer.Character
-	if not CONFIG.ACTIVE then return end
-	if not Character or not Character:FindFirstChild("Humanoid") then return end
-	local now = workspace.DistributedGameTime
-	local shouldRetarget = now - lastRetarget >= CONFIG.RETARGET_INTERVAL or not target or not target:IsA("Model") or not target:FindFirstChildOfClass("Humanoid")
-	if shouldRetarget then
+	activateTool()
+	if not CONFIG.Active then return end
+	if not player.Character or not player.Character.PrimaryPart then return end
+	local now = tick()
+	if not target or not target.Parent or now - lastRetarget > CONFIG.RetargetInt then
 		target = getTarget()
 		lastRetarget = now
 	end
-	local currentHealth = Character.Humanoid.Health
-	if lastHealth and currentHealth < lastHealth then
-		bridging = false
-		if target then aimlock() end
-	end
-	lastHealth = currentHealth
 	if target then
-		cframewalk(target, dt)
-		aimlock()
+		moveTarget(dt)
+		aimLock()
 	else
-		camera.CameraType = Enum.CameraType.Custom
+		local hum = player.Character:FindFirstChildOfClass("Humanoid")
+		if hum then hum:Move(Vector3.new(0,0,0), false) end
 	end
-	Character.Humanoid.Jump = true
-	coroutine.wrap(aimlock)()
 end)
