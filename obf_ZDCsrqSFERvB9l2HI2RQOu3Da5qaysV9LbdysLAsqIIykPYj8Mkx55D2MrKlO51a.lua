@@ -58,6 +58,7 @@ local CONFIG = {
 }
 
 local LocalPlayer = cloneref(clonedPlayers.LocalPlayer)
+local Character   = cloneref(LocalPlayer.Character)
 local camera      = workspace.CurrentCamera
 local target, lastRetarget = nil, 0
 local lastTargetY = nil
@@ -68,7 +69,7 @@ local lastDestination = nil
 
 local function getToolBySlot(slot)
 	local tools = {}
-	for _, tool in ipairs(LocalPlayer.Character and LocalPlayer.Character:GetChildren() or {}) do
+	for _, tool in ipairs(Character and Character:GetChildren() or {}) do
 		if tool:IsA("Tool") then
 			table.insert(tools, tool)
 		end
@@ -90,15 +91,15 @@ local function isLineOfSightClear(startPos, endPos, ignoreList)
 end
 
 local function getTarget()
-	if not LocalPlayer or not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then
+	if not LocalPlayer or not Character or not Character.PrimaryPart then
 		warn("getTarget: Invalid LocalPlayer or Character")
 		return nil
 	end
 	local closest = nil
 	local maxDist = CONFIG.DETECTION_DISTANCE or 100
-	local playerPosition = LocalPlayer.Character.PrimaryPart.Position
+	local playerPosition = Character.PrimaryPart.Position
 	for _, model in pairs(workspace:GetDescendants()) do
-		if not model:IsA("Model") or not model:FindFirstChildOfClass("Humanoid") or model == LocalPlayer.Character then
+		if not model:IsA("Model") or not model:FindFirstChildOfClass("Humanoid") or model == Character then
 			continue
 		end
 		local part = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
@@ -135,21 +136,10 @@ local function getAimPart(target)
 end
 
 local function aimlock()
-	if CONFIG.ACTIVE and target and target.PrimaryPart and LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+	if CONFIG.ACTIVE and target and target.PrimaryPart and Character and Character.PrimaryPart then
 		local part = getAimPart(target)
 		if part then
-			local bulletSpeed = 200
-			local distance = (target.PrimaryPart.Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
-			local predictionTime = distance / bulletSpeed
-			local targetVelocity = target.PrimaryPart.Velocity or Vector3.new(0, 0, 0)
-			local predictedPos = part.Position + targetVelocity * predictionTime
-			local inaccuracy = (100 - CONFIG.AIM_ACCURACY) / 100
-			local offset = Vector3.new(
-				math.random(-10, 10) * inaccuracy / 100,
-				math.random(-10, 10) * inaccuracy / 100,
-				math.random(-10, 10) * inaccuracy / 100
-			)
-			local aimPos = predictedPos + offset
+			local aimPos = part.Position
 			local cf = CFrame.new(camera.CFrame.Position, aimPos)
 			camera.CFrame = camera.CFrame:Lerp(cf, CONFIG.AIM_SPEED / 10)
 		end
@@ -178,8 +168,8 @@ local function performAction()
 		tool = getToolBySlot(1)
 	end
 	if tool then
-		if not tool.Parent or tool.Parent ~= LocalPlayer.Character then
-			LocalPlayer.Character.Humanoid:EquipTool(tool)
+		if not tool.Parent or tool.Parent ~= Character then
+			Character.Humanoid:EquipTool(tool)
 		end
 		tool:Activate()
 		performActionLast = now
@@ -188,10 +178,10 @@ end
 
 local function TellyBridge(target)
 	bridging = true
-	local currentPos = LocalPlayer.Character.PrimaryPart.Position
+	local currentPos = Character.PrimaryPart.Position
 	local targetPos = target.PrimaryPart.Position
 	local horizontalDiff = Vector3.new(targetPos.X - currentPos.X, 0, targetPos.Z - currentPos.Z)
-	local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+	local humanoid = Character:FindFirstChild("Humanoid")
 	local backwardDir
 	if horizontalDiff.Magnitude < 2 then
 		backwardDir = Vector3.new(0, 0, 0)
@@ -219,15 +209,15 @@ local function TellyBridge(target)
 	camera.CFrame = camera.CFrame:Lerp(desiredCFrame, 0.2)
 	local tool = getToolBySlot(3)
 	if tool then
-		if not tool.Parent or tool.Parent ~= LocalPlayer.Character then
-			LocalPlayer.Character.Humanoid:EquipTool(tool)
+		if not tool.Parent or tool.Parent ~= Character then
+			Character.Humanoid:EquipTool(tool)
 		end
 		tool:Activate()
 	end
 end
 
 local function TeleportTo(target)
-	if not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart or not target or not target.PrimaryPart then
+	if not Character or not Character.PrimaryPart or not target or not target.PrimaryPart then
 		return
 	end
 	local connection
@@ -238,17 +228,17 @@ local function TeleportTo(target)
 		end
 		local behindDirection = -target.PrimaryPart.CFrame.LookVector
 		local behindPosition = target.PrimaryPart.Position + behindDirection * 4
-		LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(behindPosition, target.PrimaryPart.Position))
+		Character:SetPrimaryPartCFrame(CFrame.new(behindPosition, target.PrimaryPart.Position))
 	end)
 	return connection
 end
 
 local function MoveTo(target)
-	if not target or not target.PrimaryPart or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") then
+	if not target or not target.PrimaryPart or not Character or not Character:FindFirstChild("Humanoid") then
 		return false
 	end
-	local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
-	local currentPos = LocalPlayer.Character.PrimaryPart.Position
+	local humanoid = Character:FindFirstChild("Humanoid")
+	local currentPos = Character.PrimaryPart.Position
 	local targetPos  = target.PrimaryPart.Position
 	local verticalDiff = targetPos.Y - currentPos.Y
 	if verticalDiff > 3 then
@@ -264,7 +254,7 @@ local function MoveTo(target)
 	if CONFIG.WALL_DETECTION then
 		local rayParams = RaycastParams.new()
 		rayParams.FilterType = Enum.RaycastFilterType.Exclude
-		rayParams.FilterDescendantsInstances = {LocalPlayer.Character, target}
+		rayParams.FilterDescendantsInstances = {Character, target}
 		local rayResult = workspace:Raycast(currentPos, (targetPos - currentPos), rayParams)
 		if rayResult then
 			desiredPosition = targetPos - direction * CONFIG.TARGET_DISTANCE + strafeDir * CONFIG.ZIGZAG_AMPLITUDE
@@ -286,10 +276,10 @@ local function toggle(_, state)
 	if state ~= Enum.UserInputState.Begin then return end
 	CONFIG.ACTIVE = not CONFIG.ACTIVE
 	target = nil
-	if not CONFIG.ACTIVE and LocalPlayer.Character then
-		local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+	if not CONFIG.ACTIVE and Character then
+		local humanoid = Character:FindFirstChild("Humanoid")
 		if humanoid then
-			humanoid:MoveTo(LocalPlayer.Character.PrimaryPart.Position)
+			humanoid:MoveTo(Character.PrimaryPart.Position)
 		end
 	end
 	if CONFIG.ACTIVE then
@@ -325,15 +315,14 @@ print(string.char(82,117,110,110,105,110,103,32,97,121,109,32) .. CONFIG.VERSION
 
 RunService.Heartbeat:Connect(function()
 	if not CONFIG.ACTIVE then return end
-	local character = LocalPlayer.Character
-	if not character or not character:FindFirstChild("Humanoid") then return end
+	if not Character or not Character:FindFirstChild("Humanoid") then return end
 	local now = workspace.DistributedGameTime
 	local shouldRetarget = now - lastRetarget >= CONFIG.RETARGET_INTERVAL or not target or not target:IsA("Model") or not target:FindFirstChildOfClass("Humanoid")
 	if shouldRetarget then
 		target = getTarget()
 		lastRetarget = now
 	end
-	local currentHealth = character.Humanoid.Health
+	local currentHealth = Character.Humanoid.Health
 	if lastHealth and currentHealth < lastHealth then
 		bridging = false
 		if target then aimlock() end
@@ -347,6 +336,6 @@ RunService.Heartbeat:Connect(function()
 	if bridging and target then
 		TellyBridge(target)
 	end
-	character.Humanoid.Jump = true
+	Character.Humanoid.Jump = true
 	coroutine.wrap(aimlock)()
 end)
