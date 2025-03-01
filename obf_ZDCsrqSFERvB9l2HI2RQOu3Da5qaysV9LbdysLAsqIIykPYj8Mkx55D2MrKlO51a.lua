@@ -119,20 +119,7 @@ end
 
 local function getAimPart(target)
 	if not target or not target:FindFirstChild("Humanoid") then return nil end
-	local parts = {
-		Head  = target:FindFirstChild("Head"),
-		Torso = target:FindFirstChild("UpperTorso") or target:FindFirstChild("Torso"),
-		Legs  = target:FindFirstChild("LeftLeg") or target:FindFirstChild("RightLeg")
-			or target:FindFirstChild("LeftFoot") or target:FindFirstChild("RightFoot"),
-	}
-	local heightDifference = camera.CFrame.Position.Y - target.PrimaryPart.Position.Y
-	if heightDifference > 2 then
-		return parts.Head or parts.Torso
-	elseif heightDifference < -2 then
-		return parts.Legs or parts.Torso
-	else
-		return parts.Torso or parts.Head or parts.Legs
-	end
+	return target:FindFirstChild("Head") or target.PrimaryPart
 end
 
 local function aimlock()
@@ -241,7 +228,7 @@ local function MoveTo(target)
 	local currentPos = Character.PrimaryPart.Position
 	local targetPos  = target.PrimaryPart.Position
 	local verticalDiff = targetPos.Y - currentPos.Y
-	if verticalDiff > 3 then
+	if verticalDiff > 10 then
 		TellyBridge(target)
 		return true
 	end
