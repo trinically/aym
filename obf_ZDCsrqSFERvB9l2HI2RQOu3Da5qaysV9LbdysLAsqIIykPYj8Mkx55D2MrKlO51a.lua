@@ -46,38 +46,42 @@ local function getTarget()
 end
 
 local function moveTarget(dt)
-	if not target or not target.PrimaryPart or not player.Character or not player.Character.PrimaryPart then return end
-	local char = player.Character
-	local hrp = char.PrimaryPart
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	if not hum then return end
+    if not target or not target.PrimaryPart or not player.Character or not player.Character.PrimaryPart then return end
+    local char = player.Character
+    local hrp = char.PrimaryPart
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
 
-	local curPos = hrp.Position
-	local tarPos = target.PrimaryPart.Position
-	local diff = tarPos - curPos
-	local dist = diff.Magnitude
+    local curPos = hrp.Position
+    local tarPos = target.PrimaryPart.Position
+    local diff = tarPos - curPos
+    local dist = diff.Magnitude
 
-	if dist > CONFIG.TargetDist then
-		local moveDir = diff.Unit
-		local speed = hum.WalkSpeed
-		local newPos = curPos + moveDir * speed * dt
-		local newY = curPos.Y
-		if tarPos.Y - curPos.Y >= CONFIG.ClimbThreshold then
-			newY = math.min(curPos.Y + CONFIG.ClimbRate * dt, tarPos.Y + 3)
-		else
-			newY = tarPos.Y + 3
-		end
-		hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(newPos, Vector3.new(tarPos.X, newY, tarPos.Z)), 0.1)
-	else
-		local angle = math.rad(math.random(0, 360))
-		local offset = Vector3.new(math.cos(angle) * CONFIG.TargetDist, 3, math.sin(angle) * CONFIG.TargetDist)
-		local blinkPos = Vector3.new(tarPos.X + offset.X, tarPos.Y + 3, tarPos.Z + offset.Z)
-		hrp.CFrame = CFrame.new(blinkPos, Vector3.new(tarPos.X, blinkPos.Y, tarPos.Z))
-	end
+    if dist > CONFIG.TargetDist then
+        local moveDir = diff.Unit
+        local speed = hum.WalkSpeed
+        local newPos = curPos + moveDir * speed * dt
+        local newY = curPos.Y
 
-	hrp.Velocity = Vector3.zero
-	hrp.AssemblyLinearVelocity = Vector3.zero
-	hrp.AssemblyAngularVelocity = Vector3.zero
+        if tarPos.Y - curPos.Y >= CONFIG.ClimbThreshold then
+            newY = math.min(curPos.Y + CONFIG.ClimbRate * dt, tarPos.Y + 3)
+        else
+            newY = tarPos.Y + 3
+        end
+
+        local lookDir = (tarPos - Vector3.new(newPos.X, newY, newPos.Z)).Unit
+        hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(newPos.X, newY, newPos.Z) * CFrame.lookAt(Vector3.new(newPos.X, newY, newPos.Z), tarPos), 0.1)
+    else
+        local angle = math.rad(math.random(0, 360))
+        local offset = Vector3.new(math.cos(angle) * CONFIG.TargetDist, 3, math.sin(angle) * CONFIG.TargetDist)
+        local blinkPos = Vector3.new(tarPos.X + offset.X, tarPos.Y + 3, tarPos.Z + offset.Z)
+
+        hrp.CFrame = CFrame.new(blinkPos, tarPos)
+    end
+
+    hrp.Velocity = Vector3.zero
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
 end
 
 local function aimLock()
