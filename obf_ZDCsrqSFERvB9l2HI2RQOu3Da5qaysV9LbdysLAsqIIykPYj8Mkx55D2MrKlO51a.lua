@@ -123,13 +123,16 @@ local function getAimPart(target)
 end
 
 local function aimlock()
-	if CONFIG.ACTIVE and target and target.PrimaryPart and Character and Character.PrimaryPart then
+	if not CONFIG.ACTIVE then return end
+	if target and target.PrimaryPart and Character and Character.PrimaryPart then
 		local part = getAimPart(target)
 		if part then
 			local aimPos = part.Position
 			local cf = CFrame.new(camera.CFrame.Position, aimPos)
 			camera.CFrame = camera.CFrame:Lerp(cf, CONFIG.AIM_SPEED / 10)
 		end
+	else
+		camera.CameraType = Enum.CameraType.Custom
 	end
 end
 
@@ -228,7 +231,7 @@ local function MoveTo(target)
 	local currentPos = Character.PrimaryPart.Position
 	local targetPos  = target.PrimaryPart.Position
 	local verticalDiff = targetPos.Y - currentPos.Y
-	if verticalDiff > 10 then
+	if verticalDiff > 3 then
 		TellyBridge(target)
 		return true
 	end
@@ -253,7 +256,7 @@ local function MoveTo(target)
 	end
 	humanoid.WalkSpeed = 16
 	local distance = (targetPos - currentPos).Magnitude
-	if math.abs(distance - CONFIG.TARGET_DISTANCE) <= CONFIG.CLICK_RANGE then
+	if distance <= CONFIG.CLICK_RANGE then
 		performAction()
 	end
 	return true
@@ -317,8 +320,9 @@ RunService.Heartbeat:Connect(function()
 	lastHealth = currentHealth
 	if target then
 		MoveTo(target)
-	else
 		aimlock()
+	else
+		camera.CameraType = Enum.CameraType.Custom
 	end
 	if bridging and target then
 		TellyBridge(target)
