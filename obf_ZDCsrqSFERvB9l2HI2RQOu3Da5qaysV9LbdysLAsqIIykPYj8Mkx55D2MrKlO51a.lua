@@ -16,7 +16,7 @@
 
 local Players              = game:GetService("Players")
 local UserInputService     = game:GetService("UserInputService")
-local RunService           = game:GetService("RunService")
+local RunService           = game:GetService("RunService") 
 local ContextActionService = game:GetService("ContextActionService")
 local ReplicatedStorage    = game:GetService("ReplicatedStorage")
 
@@ -57,8 +57,8 @@ local CONFIG = {
 	},
 }
 
-local LocalPlayer = cloneref(clonedPlayers.LocalPlayer)
-local Character   = cloneref(LocalPlayer.Character)
+local LocalPlayer = clonedPlayers.LocalPlayer
+local Character   = LocalPlayer.Character
 local camera      = workspace.CurrentCamera
 local target, lastRetarget = nil, 0
 local lastTargetY = nil
