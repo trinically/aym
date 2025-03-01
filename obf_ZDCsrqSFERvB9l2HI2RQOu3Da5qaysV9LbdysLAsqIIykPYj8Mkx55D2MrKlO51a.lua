@@ -1,65 +1,48 @@
---!nocheck
-
---[[ 
-                  ___       ___           ___                       ___           ___           ___           ___           ___     
-      ___        /\__\     /\__\         /\__\          ___        /\__\         /\  \         /\__\         /\  \         /\  \    
-     /\  \      /:/  /    /:/  /        /::|  |        /\  \      /::|  |       /::\  \       /::|  |       /::\  \       /::\  \   
-     \:\  \    /:/  /    /:/  /        /:|:|  |        \:\  \    /:|:|  |      /:/\:\  \     /:|:|  |      /:/\:\  \     /:/\:\  \  
-     /::\__\  /:/  /    /:/  /  ___   /:/|:|__|__      /::\__\  /:/|:|  |__   /::\~\:\  \   /:/|:|  |__   /:/  \:\  \   /::\~\:\  \ 
-  __/:/\/__/ /:/__/    /:/__/  /\__\ /:/ |::::\__\  __/:/\/__/ /:/ |:| /\__\ /:/\:\ \:\__\ /:/ |:| /\__\ /:/__/ \:\__\ /:/\:\ \:\__\
- /\/:/  /    \:\  \    \:\  \ /:/  / \/__/~~/:/  / /\/:/  /    \/__|:|/:/  / \/__\:\/:/  / \/__|:|/:/  / \:\  \  \/__/ \:\~\:\ \/__/
- \::/__/      \:\  \    \:\  /:/  /        /:/  /  \::/__/         |:/:/  /       \::/  /      |:/:/  /   \:\  \        \:\ \:\__\  
-  \:\__\       \:\  \    \:\/:/  /        /:/  /    \:\__\         |::/  /        /:/  /       |::/  /     \:\  \        \:\ \/__/  
-   \/__/        \:\__\    \::/  /        /:/  /      \/__/         /:/  /        /:/  /        /:/  /       \:\__\        \:\__\    
-                 \/__/     \/__/         \/__/                     \/__/         \/__/         \/__/         \/__/         \/__/  
---]]
-
-local Players              = game:GetService("Players")
-local UserInputService     = game:GetService("UserInputService")
-local RunService           = game:GetService("RunService") 
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
-local ReplicatedStorage    = game:GetService("ReplicatedStorage")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local clonedPlayers              = cloneref(Players)
-local clonedUserInputService     = cloneref(UserInputService)
-local clonedRunService           = cloneref(RunService)
+local clonedPlayers = cloneref(Players)
+local clonedUserInputService = cloneref(UserInputService)
+local clonedRunService = cloneref(RunService)
 local clonedContextActionService = cloneref(ContextActionService)
-local clonedReplicatedStorage    = cloneref(ReplicatedStorage)
+local clonedReplicatedStorage = cloneref(ReplicatedStorage)
 
 local CONFIG = {
-	DETECTION_DISTANCE    = 1000,
-	AIM_SPEED             = 8,
-	AIM_ACCURACY          = 100,
-	ACTIVE                = true,
-	TELEPORT_MODE         = false, 
-	WALL_DETECTION        = true,
-	EXCLUDE_NPCS          = false,
-	EXCLUDE_PLAYERS       = false,
-	EXCLUDE_TEAMMATES     = false,
-	TOGGLE_KEY            = Enum.KeyCode.F,
-	TELEPORT_TOGGLE_KEY   = Enum.KeyCode.Q,
-	VERSION               = "v1.3 Gamesense fixed",
-	ACTION_NAME           = "ToggleAimston",
-	RETARGET_INTERVAL     = 5,
-	ZIGZAG_FREQUENCY      = 7,
-	ZIGZAG_AMPLITUDE      = 3,
-	JUMP_COOLDOWN         = 0.1,
-	TARGET_DISTANCE       = 5,
+	DETECTION_DISTANCE = 1000,
+	AIM_SPEED = 8,
+	AIM_ACCURACY = 100,
+	ACTIVE = true,
+	TELEPORT_MODE = false,
+	WALL_DETECTION = true,
+	EXCLUDE_NPCS = false,
+	EXCLUDE_PLAYERS = false,
+	EXCLUDE_TEAMMATES = false,
+	TOGGLE_KEY = Enum.KeyCode.F,
+	TELEPORT_TOGGLE_KEY = Enum.KeyCode.Q,
+	VERSION = "v1.3 Gamesense fixed",
+	ACTION_NAME = "ToggleAimston",
+	RETARGET_INTERVAL = 7,
+	ZIGZAG_FREQUENCY = 7,
+	ZIGZAG_AMPLITUDE = 3,
+	JUMP_COOLDOWN = 0.1,
+	TARGET_DISTANCE = 5,
 	MAX_VERTICAL_DISTANCE = 20,
-	CLICK_RANGE           = 32,
-	CPS                   = 50,
-	CPS_VARIATION         = 2,
-	TELEPORT_ACTION_NAME  = "ToggleTeleportMode",
-	TELEPORT_PATTERN      = {
-		AWAY_DISTANCE     = 100,
-		RETURN_DISTANCE   = 2,
-		COOLDOWN          = 0.2,
+	CLICK_RANGE = 32,
+	CPS = 50,
+	CPS_VARIATION = 2,
+	TELEPORT_ACTION_NAME = "ToggleTeleportMode",
+	TELEPORT_PATTERN = {
+		AWAY_DISTANCE = 100,
+		RETURN_DISTANCE = 2,
+		COOLDOWN = 0.2,
 	},
 }
 
 local LocalPlayer = clonedPlayers.LocalPlayer
-
-local camera      = workspace.CurrentCamera
+local camera = workspace.CurrentCamera
 local target, lastRetarget = nil, 0
 local lastTargetY = nil
 local bridging = false
@@ -68,7 +51,7 @@ local performActionLast = 0
 local lastDestination = nil
 
 local function getToolBySlot(slot)
-	local Character   = LocalPlayer.Character
+	local Character = LocalPlayer.Character
 	local tools = {}
 	for _, tool in ipairs(Character and Character:GetChildren() or {}) do
 		if tool:IsA("Tool") then
@@ -88,12 +71,11 @@ local function isLineOfSightClear(startPos, endPos, ignoreList)
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
 	rayParams.FilterDescendantsInstances = ignoreList or {}
 	local rayResult = workspace:Raycast(startPos, (endPos - startPos), rayParams)
-
 	return true
 end
 
 local function getTarget()
-	local Character   = LocalPlayer.Character
+	local Character = LocalPlayer.Character
 	if not LocalPlayer or not Character or not Character.PrimaryPart then
 		warn("getTarget: Invalid LocalPlayer or Character")
 		return nil
@@ -126,8 +108,7 @@ local function getAimPart(target)
 end
 
 local function aimlock()
-	if not CONFIG.ACTIVE then return end
-	local Character   = LocalPlayer.Character
+	local Character = LocalPlayer.Character
 	if target and target.PrimaryPart and Character and Character.PrimaryPart then
 		local part = getAimPart(target)
 		if part then
@@ -141,25 +122,20 @@ local function aimlock()
 end
 
 local function performAction()
-	local Character   = LocalPlayer.Character
+	local Character = LocalPlayer.Character
 	local now = workspace.DistributedGameTime
 	local actualCPS = CONFIG.CPS + math.random(-CONFIG.CPS_VARIATION, CONFIG.CPS_VARIATION)
 	local actionInterval = 1 / actualCPS
-
 	if now - performActionLast < actionInterval then
 		return
 	end
-
-	local tool
-	
-	tool = getToolBySlot(1)
-
+	local tool = getToolBySlot(1)
 	tool:Activate()
 	performActionLast = now
 end
 
 local function TellyBridge(target)
-	local Character   = LocalPlayer.Character
+	local Character = LocalPlayer.Character
 	bridging = true
 	local currentPos = Character.PrimaryPart.Position
 	local targetPos = target.PrimaryPart.Position
@@ -200,7 +176,7 @@ local function TellyBridge(target)
 end
 
 local function TeleportTo(target)
-	local Character   = LocalPlayer.Character
+	local Character = LocalPlayer.Character
 	if not Character or not Character.PrimaryPart or not target or not target.PrimaryPart then
 		return
 	end
@@ -217,97 +193,71 @@ local function TeleportTo(target)
 	return connection
 end
 
---[[ 
-local function MoveTo(target)
-	local Character   = LocalPlayer.Character
-	if not target or not target.PrimaryPart or not Character or not Character:FindFirstChild("Humanoid") then
-		return false
-	end
-	local humanoid = Character:FindFirstChild("Humanoid")
-	local currentPos = Character.PrimaryPart.Position
-	local targetPos  = target.PrimaryPart.Position
-	local verticalDiff = targetPos.Y - currentPos.Y
-
-	--if verticalDiff > 3 then
-	--	TellyBridge(target)
-	--	return true
-	--end
-
-	local direction = (targetPos - currentPos).Unit
-	local timeNow = workspace.DistributedGameTime
-	local strafeDir = Vector3.new(-direction.Z, 0, direction.X)
-	local strafeOffset = strafeDir * (math.sin(timeNow * CONFIG.ZIGZAG_FREQUENCY + math.rad(math.random(0,360))) * CONFIG.ZIGZAG_AMPLITUDE)
-	local randomOffset = Vector3.new(math.random(-1,1), 0, math.random(-1,1))
-	local desiredPosition = targetPos - direction * CONFIG.TARGET_DISTANCE + strafeOffset + randomOffset
-
-	if not lastDestination or (lastDestination - desiredPosition).Magnitude > 1 then
-		humanoid:MoveTo(desiredPosition)
-		lastDestination = desiredPosition
-	end
-	humanoid.WalkSpeed = 16
-
-	local distance = (targetPos - currentPos).Magnitude
-
-	if distance <= CONFIG.CLICK_RANGE then
-		performAction()
-	end
-
-	return true
-end
-]]--
-
 local function cframewalk(target, dt)
 	local Character = LocalPlayer.Character
-	if not target or not target.PrimaryPart or not Character or not Character.PrimaryPart then
-		return false
-	end
-	
-	local currentPos = Character.PrimaryPart.Position
+	if not target or not target.PrimaryPart or not Character or not Character.PrimaryPart then return false end
+	local HRP = Character.PrimaryPart
+	local currentPos = HRP.Position
 	local targetPos = target.PrimaryPart.Position
-
-	local direction = (targetPos - currentPos)
+	local direction = targetPos - currentPos
 	if direction.Magnitude == 0 then return true end
 	local dirUnit = direction.Unit
-	
 	local timeNow = workspace.DistributedGameTime
 	local strafeDir = Vector3.new(-dirUnit.Z, 0, dirUnit.X)
 	local strafeOffset = strafeDir * (math.sin(timeNow * CONFIG.ZIGZAG_FREQUENCY + math.rad(math.random(0,360))) * CONFIG.ZIGZAG_AMPLITUDE)
 	local randomOffset = Vector3.new(math.random(-1,1), 0, math.random(-1,1))
 	local desiredPosition = targetPos - dirUnit * CONFIG.TARGET_DISTANCE + strafeOffset + randomOffset
-
 	local moveVector = desiredPosition - currentPos
 	local moveDistance = moveVector.Magnitude
-	if moveDistance < 1 then
-		performAction()
-		return true
-	end
+	if moveDistance < 1 then performAction() return true end
 	local moveDir = moveVector.Unit
-	
 	local speed = Character.Humanoid.WalkSpeed
 	local step = speed * dt
 	if step > moveDistance then step = moveDistance end
 	local newPos = currentPos + moveDir * step
-
-	local rayOrigin = newPos + Vector3.new(0, 5, 0)
-	local rayDirection = Vector3.new(0, -10, 0)
-	local raycastParams = RaycastParams.new()
-	raycastParams.FilterDescendantsInstances = {Character}
-	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-	local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-	
-	local offsetY = Character.PrimaryPart.Size.Y / 2
-	if rayResult then
-		newPos = Vector3.new(newPos.X, rayResult.Position.Y + offsetY, newPos.Z)
+	local baseY = currentPos.Y
+	local newPosH = Vector3.new(newPos.X, baseY, newPos.Z)
+	local newCFrame = CFrame.new(newPosH, newPosH + moveDir)
+	local leftFoot = Character:FindFirstChild("LeftFoot")
+	local rightFoot = Character:FindFirstChild("RightFoot")
+	if leftFoot and rightFoot then
+		local leftLocalOffset = HRP.CFrame:PointToObjectSpace(leftFoot.Position)
+		local rightLocalOffset = HRP.CFrame:PointToObjectSpace(rightFoot.Position)
+		local newLeftPos = newCFrame * leftLocalOffset
+		local newRightPos = newCFrame * rightLocalOffset
+		local leftRayOrigin = newLeftPos + Vector3.new(0,5,0)
+		local rightRayOrigin = newRightPos + Vector3.new(0,5,0)
+		local rayDirection = Vector3.new(0,-10,0)
+		local raycastParams = RaycastParams.new()
+		raycastParams.FilterDescendantsInstances = {Character}
+		raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+		local leftRayResult = workspace:Raycast(leftRayOrigin, rayDirection, raycastParams)
+		local rightRayResult = workspace:Raycast(rightRayOrigin, rayDirection, raycastParams)
+		local requiredY_left = leftRayResult and (leftRayResult.Position.Y - leftLocalOffset.Y) or baseY
+		local requiredY_right = rightRayResult and (rightRayResult.Position.Y - rightLocalOffset.Y) or baseY
+		local requiredHRPY = math.max(requiredY_left, requiredY_right)
+		newPos = Vector3.new(newPos.X, requiredHRPY, newPos.Z)
+		newCFrame = CFrame.new(newPos, newPos + moveDir)
 	else
-		newPos = Vector3.new(newPos.X, currentPos.Y, newPos.Z)
+		local rayOrigin = newPos + Vector3.new(0,5,0)
+		local rayDirection = Vector3.new(0,-10,0)
+		local raycastParams = RaycastParams.new()
+		raycastParams.FilterDescendantsInstances = {Character}
+		raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+		local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+		local offsetY = HRP.Size.Y/2
+		if rayResult then
+			newPos = Vector3.new(newPos.X, rayResult.Position.Y + offsetY, newPos.Z)
+		else
+			newPos = Vector3.new(newPos.X, currentPos.Y, newPos.Z)
+		end
+		newCFrame = CFrame.new(newPos, newPos + moveDir)
 	end
-
-	local newCFrame = CFrame.new(newPos, newPos + moveDir)
 	Character:SetPrimaryPartCFrame(newCFrame)
 end
 
 local function toggle(_, state)
-	local Character   = LocalPlayer.Character
+	local Character = LocalPlayer.Character
 	if state ~= Enum.UserInputState.Begin then return end
 	CONFIG.ACTIVE = not CONFIG.ACTIVE
 	target = nil
@@ -349,7 +299,7 @@ end
 print(string.char(82,117,110,110,105,110,103,32,97,121,109,32) .. CONFIG.VERSION)
 
 RunService.Heartbeat:Connect(function(dt)
-	local Character   = LocalPlayer.Character
+	local Character = LocalPlayer.Character
 	if not CONFIG.ACTIVE then return end
 	if not Character or not Character:FindFirstChild("Humanoid") then return end
 	local now = workspace.DistributedGameTime
@@ -359,25 +309,17 @@ RunService.Heartbeat:Connect(function(dt)
 		lastRetarget = now
 	end
 	local currentHealth = Character.Humanoid.Health
-
 	if lastHealth and currentHealth < lastHealth then
 		bridging = false
 		if target then aimlock() end
 	end
-
 	lastHealth = currentHealth
-
 	if target then
 		cframewalk(target, dt)
 		aimlock()
 	else
 		camera.CameraType = Enum.CameraType.Custom
 	end
-
-	--if bridging and target then
-	--	TellyBridge(target)
-	--end
-
 	Character.Humanoid.Jump = true
 	coroutine.wrap(aimlock)()
 end)
